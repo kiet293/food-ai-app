@@ -40,6 +40,7 @@
 //   });
 // };
 
+import Constants from 'expo-constants';
 
 // Vẫn giữ nguyên cấu trúc dữ liệu
 export interface AIAnalysisResult {
@@ -48,8 +49,32 @@ export interface AIAnalysisResult {
   instructions: string[];
 }
 
+// Hàm tự động bắt IP máy tính
+const getBackendUrl = () => {
+  // hostUri sẽ chứa chuỗi dạng "192.168.1.23:8081"
+  const hostUri = Constants.expoConfig?.hostUri;
+
+  if (hostUri) {
+    // Cắt đôi chuỗi ở dấu ":", lấy phần IP ở đằng trước
+    const ipAddress = hostUri.split(':')[0];
+    // Ghép với cổng 5000 của Python
+    return `http://${ipAddress}:5000/api/analyze`;
+  }
+
+  // Đề phòng lỗi thì trả về localhost
+  return 'http://localhost:5000/api/analyze';
+};
+
 // ⚠️ THAY ĐỊA CHỈ IP DƯỚI ĐÂY BẰNG IPv4 CỦA MÁY TÍNH BẠN
-const SERVER_URL = 'http://192.168.1.23:5000/api/analyze';
+// Cách 1: Set cứng ip của máy vào 
+// const SERVER_URL = 'http://192.168.1.23:5000/api/analyze';
+
+// Cách 2: "Ăn theo" IP của Expo
+const SERVER_URL = getBackendUrl();
+
+// Cách 3: Dùng ngrok
+//const SERVER_URL = 'https://spoiling-decorator-polish.ngrok-free.dev/api/analyze';
+
 
 export const analyzeImageWithAI = async (imageUri: string): Promise<AIAnalysisResult> => {
   try {
