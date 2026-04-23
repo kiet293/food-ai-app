@@ -6,10 +6,10 @@ from app.schemas.recipe import Ingredient
 # Nạp model 1 lần duy nhất khi server khởi động
 try:
     # Trỏ đúng đường dẫn tới file best.pt đang nằm cùng thư mục
-    model = YOLO("app/ai/best.pt") 
-    print("✅ Đã nạp thành công bộ não AI (best.pt)!")
+    model = YOLO("app/ai/egg_tomato_beff.pt") 
+    print("✅ Đã nạp thành công bộ não AI (egg_tomato_beff.pt)!")
 except Exception as e:
-    print(f"❌ Lỗi: Không tìm thấy file best.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
+    print(f"❌ Lỗi: Không tìm thấy file egg_tomato_beff.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
     model = None
 
 def analyze_food_image(image_bytes: bytes) -> tuple[list[Ingredient], str, list[str]]:
@@ -33,15 +33,6 @@ def analyze_food_image(image_bytes: bytes) -> tuple[list[Ingredient], str, list[
     # Đóng gói nguyên liệu
     final_ingredients = [Ingredient(name=k, probability=v) for k, v in detected_items.items()]
     ing_names = [i.name.lower() for i in final_ingredients]
-
-    # ⚠️ THÊM ĐOẠN NÀY ĐỂ GIẢ LẬP KHI CHƯA CÓ FILE BEST.PT
-    if not final_ingredients:
-        final_ingredients = [
-            Ingredient(name="Cà chua (Giả lập vì chưa có AI)", probability=98),
-            Ingredient(name="Trứng gà (Giả lập vì chưa có AI)", probability=95)
-        ]
-
-    ing_names = [str(i.name).lower() for i in final_ingredients]
 
     # Thuật toán gợi ý món
     recipe_name = "Món Ăn Bí Ẩn"
