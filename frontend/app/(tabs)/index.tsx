@@ -7,7 +7,7 @@ import { useImageAnalysis } from "../../hooks/useImageAnalysis";
 
 export default function HomeScreen() {
   const {
-    image,
+    images,
     isLoading,
     resultData,
     pickImage,
@@ -26,9 +26,9 @@ export default function HomeScreen() {
 
         <ActionButtons onOpenCamera={openCamera} onPickImage={pickImage} />
 
-        {image && (
+        {images.length > 0 && (
           <ImagePreview
-            imageUri={image}
+            imageUris={images}
             isLoading={isLoading}
             onAnalyze={analyzeImage}
           />

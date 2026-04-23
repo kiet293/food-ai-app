@@ -1,48 +1,6 @@
-// export const analyzeImageWithAI = async (imageUri: string): Promise<string> => {
-//   // ĐÂY LÀ NƠI SAU NÀY BẠN SẼ DÙNG AXIOS ĐỂ GỌI API THẬT
-//   return new Promise((resolve) => {
-//     // Tạm thời dùng setTimeout để mô phỏng việc chờ Server xử lý mất 3 giây
-//     setTimeout(() => {
-//       resolve(
-//         "🤖 AI nhận diện được:\n- Cà chua (98%)\n- Trứng gà (95%)\n\n🍲 Gợi ý món: Canh Cà Chua Trứng"
-//       );
-//     }, 3000);
-//   });
-// };
-
-
-// Định nghĩa cấu trúc dữ liệu mà AI sẽ trả về
-// export interface AIAnalysisResult {
-//   ingredients: Array<{ name: string; probability: number }>;
-//   recipeName: string;
-//   instructions: string[];
-// }
-
-// export const analyzeImageWithAI = async (imageUri: string): Promise<AIAnalysisResult> => {
-//   return new Promise((resolve) => {
-//     // Giả lập Server đang xử lý mất 3 giây
-//     setTimeout(() => {
-//       resolve({
-//         ingredients: [
-//           { name: "Cà chua", probability: 98 },
-//           { name: "Trứng gà", probability: 95 }
-//         ],
-//         recipeName: "Canh Cà Chua Trứng",
-//         instructions: [
-//           "1. Rửa sạch cà chua, thái múi cau. Đánh tan trứng gà ra bát.",
-//           "2. Phi thơm hành tím, cho cà chua vào xào mềm để tạo màu.",
-//           "3. Đổ lượng nước vừa đủ vào nồi đun sôi, nêm nếm gia vị.",
-//           "4. Đổ từ từ trứng vào nồi, khuấy nhẹ tay để tạo vân mây.",
-//           "5. Tắt bếp, rắc hành lá và tiêu lên trên. Thưởng thức nóng!"
-//         ]
-//       });
-//     }, 3000);
-//   });
-// };
-
 import Constants from 'expo-constants';
 
-// Vẫn giữ nguyên cấu trúc dữ liệu
+// cấu trúc dữ liệu
 export interface AIAnalysisResult {
   ingredients: Array<{ name: string; probability: number }>;
   recipeName: string;
@@ -76,42 +34,52 @@ const SERVER_URL = getBackendUrl();
 //const SERVER_URL = 'https://spoiling-decorator-polish.ngrok-free.dev/api/analyze';
 
 
-export const analyzeImageWithAI = async (imageUri: string): Promise<AIAnalysisResult> => {
+export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalysisResult> => {
   try {
-    // 1. Đóng gói ảnh vào FormData
+    // 1. Chuẩn bị thùng hàng. Đóng gói ảnh vào FormData
     const formData = new FormData();
 
-    // React Native bắt buộc phải có đủ uri, name, và type để gửi file
-    formData.append('image_file', {
-      uri: imageUri,
-      name: 'photo.jpg',
-      type: 'image/jpeg',
-    } as any);
+    // 2. Lặp qua từng bức ảnh người dùng chọn và nhét vào thùng
+    imageUris.forEach((uri, index) => {
+      // Trích xuất tên file và định dạng để Server hiểu
+      const filename = uri.split('/').pop() || `photo_${index}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
 
-    // 2. Gửi gói hàng qua mạng đến Server
+      // ⚠️ QUAN TRỌNG: Tên biến phải là 'image_files' (có chữ s) để khớp với List[UploadFile] bên Python
+      formData.append('image_files', {
+        uri: uri,
+        name: filename,
+        type: type,
+      } as any);
+    });
+
+    // 3. Gọi anh shipper chở hàng đi
+    console.log("🚀 Đang gửi", imageUris.length, "bức ảnh lên Server...");
     const response = await fetch(SERVER_URL, {
       method: 'POST',
       body: formData,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      // BỎ HEADER NÀY ĐI
+      // React Native sẽ tự động tạo Content-Type kèm boundary (dấu phân cách file)
     });
 
     if (!response.ok) {
       throw new Error('Server AI đang từ chối kết nối');
     }
 
-    // 3. Mở kiện hàng Server gửi về (JSON)
+    // 4. Mở kiện hàng Server gửi về (JSON)
     const data = await response.json();
     return data;
 
   } catch (error) {
-    console.error("Lỗi kết nối Server:", error);
-    // Trả về một kết quả báo lỗi để app không bị crash
+    console.error("❌ Lỗi kết nối Server:", error);
     return {
       ingredients: [],
       recipeName: "Lỗi kết nối Server",
-      instructions: ["Không thể kết nối đến máy tính của bạn.", "Hãy kiểm tra lại địa chỉ IP và đảm bảo Server FastAPI đang chạy."]
+      instructions: [
+        "Không thể kết nối đến máy tính của bạn.",
+        "Hãy kiểm tra lại xem Server FastAPI đã chạy chưa, hoặc kiểm tra lại đường truyền mạng nhé."
+      ]
     };
   }
 };

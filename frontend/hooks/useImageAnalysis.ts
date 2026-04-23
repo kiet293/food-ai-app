@@ -1,23 +1,22 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { AIAnalysisResult, analyzeImageWithAI } from '../services/aiService';
+import { AIAnalysisResult, analyzeImagesWithAI } from '../services/aiService';
 
 export function useImageAnalysis() {
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [resultData, setResultData] = useState<AIAnalysisResult | null>(null);
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsMultipleSelection: true,
       quality: 1,
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setImages(result.assets.map(a => a.uri));
       setResultData(null);
     }
   };
@@ -40,19 +39,19 @@ export function useImageAnalysis() {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setImages([result.assets[0].uri]);
       setResultData(null);
     }
   };
 
   const analyzeImage = async () => {
-    if (!image) return;
+    if (images.length === 0) return;
 
     setIsLoading(true);
     setResultData(null);
 
     try {
-      const result = await analyzeImageWithAI(image);
+      const result = await analyzeImagesWithAI(images);
       setResultData(result);
     } catch (error) {
       console.log(error);
@@ -62,7 +61,7 @@ export function useImageAnalysis() {
   };
 
   return {
-    image,
+    images,
     isLoading,
     resultData,
     pickImage,

@@ -31,14 +31,24 @@ def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
 
     # Kỹ thuật Prompt Engineering: Ép Gemini trả về JSON chuẩn
     prompt = f"""
-    Tôi có các nguyên liệu sau: {', '.join(ingredients_list)}.
-    Hãy gợi ý 1 món ăn Việt Nam phổ biến có thể nấu từ các nguyên liệu này.
-    Trả về cấu trúc JSON sau:
+    Đóng vai trò là một Siêu đầu bếp chuyên gia ẩm thực Việt Nam.
+    Người dùng vừa cung cấp cho bạn danh sách các nguyên liệu họ đang có: {', '.join(ingredients_list)}.
+    
+    Nhiệm vụ của bạn:
+    1. Gợi ý 1 món ăn Việt Nam ngon nhất, thực tế và dễ nấu nhất từ các nguyên liệu trên.
+    2. Bạn được phép giả định trong bếp đã có sẵn các gia vị cơ bản (mắm, muối, tiêu, đường, dầu ăn, hành tỏi, v.v.).
+    3. Nếu các nguyên liệu đưa vào hoàn toàn KHÔNG hợp nhau (ví dụ: Thịt bò và Dưa hấu), hãy thông minh chọn ra nhóm nguyên liệu tốt nhất trong số đó để nấu, bỏ qua món không hợp.
+    4. Viết hướng dẫn nấu ăn thật sinh động, chi tiết, dễ hiểu cho người mới bắt đầu.
+    
+    Yêu cầu ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Chỉ trả về chuỗi JSON chuẩn, không giải thích gì thêm):
     {{
-        "recipeName": "Tên món ăn",
-        "instructions": ["Bước 1...", "Bước 2...", "Bước 3..."]
+        "recipeName": "Tên món ăn hấp dẫn (Ví dụ: Bò lúc lắc, Canh cà chua trứng...)",
+        "instructions": [
+            "Bước 1: Sơ chế - (Chi tiết cách làm...)",
+            "Bước 2: Chế biến - (Chi tiết cách làm...)",
+            "Bước 3: Hoàn thiện - (Chi tiết cách làm...)"
+        ]
     }}
-    Lưu ý: Ngôn ngữ bằng tiếng Việt.
     """
     try:
         # Sử dụng JSON mode của Gemini để ép kiểu trả về
@@ -56,8 +66,8 @@ def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
         print(f"❌ Lỗi gọi Gemini: {e}")
         return "Lỗi gợi ý món ăn", ["Không thể kết nối với bộ não Gemini lúc này."]
 
-def analyze_food_image(image_bytes: bytes) -> tuple[list[Ingredient], str, list[str]]:
-    """Hàm này nhận ảnh, cho AI xem và trả về kết quả"""
+def analyze_food_image(image_bytes: bytes) -> list[Ingredient]:
+    """Hàm này nhận ảnh, cho YOLO xem và trả về danh sách nguyên liệu"""
     img = Image.open(io.BytesIO(image_bytes))
     detected_items = {}
 
@@ -78,10 +88,4 @@ def analyze_food_image(image_bytes: bytes) -> tuple[list[Ingredient], str, list[
     # Đóng gói nguyên liệu
     final_ingredients = [Ingredient(name=k, probability=v) for k, v in detected_items.items()]
 
-    # Gửi thẳng danh sách tên TIẾNG VIỆT cho Gemini
-    ing_names = [i.name for i in final_ingredients]
-
-    # Gợi ý món ăn từ Gemini
-    recipe_name, instructions = ask_gemini_for_recipe(ing_names)
-
-    return final_ingredients, recipe_name, instructions
+    return final_ingredients
