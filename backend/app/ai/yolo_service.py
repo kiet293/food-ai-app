@@ -5,6 +5,7 @@ from ultralytics import YOLO
 from PIL import Image
 import io
 from app.schemas.recipe import Ingredient
+from app.utils.constants import YOLO_VIETNAMESE_MAP
 from dotenv import load_dotenv
 
 # Load biến môi trường từ file .env
@@ -70,11 +71,14 @@ def analyze_food_image(image_bytes: bytes) -> tuple[list[Ingredient], str, list[
                 class_name = model.names[class_id]
                 
                 if confidence > 50:
-                    if class_name not in detected_items or confidence > detected_items[class_name]:
-                        detected_items[class_name] = confidence
+                    vietnamese_name = YOLO_VIETNAMESE_MAP.get(class_name, class_name)
+                    if vietnamese_name not in detected_items or confidence > detected_items[vietnamese_name]:
+                        detected_items[vietnamese_name] = confidence
 
     # Đóng gói nguyên liệu
     final_ingredients = [Ingredient(name=k, probability=v) for k, v in detected_items.items()]
+
+    # Gửi thẳng danh sách tên TIẾNG VIỆT cho Gemini
     ing_names = [i.name for i in final_ingredients]
 
     # Gợi ý món ăn từ Gemini
