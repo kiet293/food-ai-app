@@ -18,10 +18,10 @@ gemini_model = genai.GenerativeModel('gemini-flash-latest')
 # Nạp model 1 lần duy nhất khi server khởi động
 try:
     # Trỏ đúng đường dẫn tới file best.pt đang nằm cùng thư mục
-    model = YOLO("app/ai/egg_tomato_beff.pt") 
-    print("✅ Đã nạp thành công bộ não AI (egg_tomato_beff.pt)!")
+    model = YOLO("app/ai/best.pt") 
+    print("✅ Đã nạp thành công bộ não AI (best.pt)!")
 except Exception as e:
-    print(f"❌ Lỗi: Không tìm thấy file egg_tomato_beff.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
+    print(f"❌ Lỗi: Không tìm thấy file best.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
     model = None
 
 def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:

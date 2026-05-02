@@ -1,7 +1,7 @@
 import React from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, View } from 'react-native';
-import { AIAnalysisResult } from '../services/aiService';
-import { saveRecipe } from '../services/storageService';
+import { ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { saveRecipeToDatabase, AIAnalysisResult } from '../services/aiService';
+
 
 interface AnalysisResultProps {
   isLoading: boolean;
@@ -9,10 +9,10 @@ interface AnalysisResultProps {
 }
 
 export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resultData }) => {
-  const handleSave = async () => {
+  const handleSaveRecipe = async () => {
     if (resultData) {
-      const success = await saveRecipe(resultData);
-      if (success) {
+      const isSuccess = await saveRecipeToDatabase(resultData);
+      if (isSuccess) {
         Alert.alert("Thành công! 🎉", "Đã lưu công thức vào máy.");
       } else {
         Alert.alert("Lỗi", "Không thể lưu lúc này.");
@@ -33,7 +33,10 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
 
   if (resultData) {
     return (
-      <View style={styles.resultContainer}>
+      <ScrollView
+        style={styles.resultContainer}
+        showsVerticalScrollIndicator={false} // Ẩn thanh cuộn cho đẹp
+      >
         {/* Phần 1: Nguyên liệu nhận diện được */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🛒 Nguyên liệu phát hiện:</Text>
@@ -55,10 +58,12 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
         </View>
 
         <View style={styles.saveButtonContainer}>
-          <Button title="❤️ Lưu công thức này" color="#ff4757" onPress={handleSave} />
+          <Button title="❤️ Lưu công thức này" color="#ff4757" onPress={handleSaveRecipe} />
         </View>
 
-      </View>
+        {/* Thêm một khoảng trống nhỏ ở cuối để nút không bị dính chặt vào đáy màn hình */}
+        <View style={{ height: 40 }} />
+      </ScrollView>
     );
   }
 
@@ -71,7 +76,6 @@ const styles = StyleSheet.create({
   resultContainer: {
     marginTop: 20,
     width: "100%",
-    flex: 1, // Để nội dung dài có thể cuộn được
   },
   section: {
     backgroundColor: "#fff",
