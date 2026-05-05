@@ -15,6 +15,9 @@ YOLO_VIETNAMESE_MAP = {
     "pepper": "Ớt chuông",
     "pumpkin": "Bí ngô",
     "mushroom": "Nấm",
-    "bread": "Bánh mì"
+    "bread": "Bánh mì",
+    "fish": "Cá",
+    "ginger": "Gừng",
+    "garlic": "Tỏi"
     # Bạn bổ sung tiếp các nguyên liệu khác có trong bộ Dataset của bạn vào đây nhé
 }

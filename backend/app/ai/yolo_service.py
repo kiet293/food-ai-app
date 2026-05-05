@@ -9,7 +9,7 @@ from app.utils.constants import YOLO_VIETNAMESE_MAP
 from dotenv import load_dotenv
 
 # Load biến môi trường từ file .env
-load_dotenv()
+load_dotenv(override=True)
 
 # Cấu hình Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -17,11 +17,11 @@ gemini_model = genai.GenerativeModel('gemini-flash-latest')
 
 # Nạp model 1 lần duy nhất khi server khởi động
 try:
-    # Trỏ đúng đường dẫn tới file best.pt đang nằm cùng thư mục
-    model = YOLO("app/ai/best.pt") 
-    print("✅ Đã nạp thành công bộ não AI (best.pt)!")
+    # Trỏ đúng đường dẫn tới file bestCT.pt đang nằm cùng thư mục
+    model = YOLO("app/ai/bestCT.pt") 
+    print("✅ Đã nạp thành công bộ não AI (bestCT.pt)!")
 except Exception as e:
-    print(f"❌ Lỗi: Không tìm thấy file best.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
+    print(f"❌ Lỗi: Không tìm thấy file bestCT.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
     model = None
 
 def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
@@ -80,7 +80,7 @@ def analyze_food_image(image_bytes: bytes) -> list[Ingredient]:
                 confidence = int(box.conf[0] * 100)
                 class_name = model.names[class_id]
                 
-                if confidence > 50:
+                if confidence > 60:
                     vietnamese_name = YOLO_VIETNAMESE_MAP.get(class_name, class_name)
                     if vietnamese_name not in detected_items or confidence > detected_items[vietnamese_name]:
                         detected_items[vietnamese_name] = confidence
@@ -89,3 +89,34 @@ def analyze_food_image(image_bytes: bytes) -> list[Ingredient]:
     final_ingredients = [Ingredient(name=k, probability=v) for k, v in detected_items.items()]
 
     return final_ingredients
+
+def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, user_message: str) -> tuple[str, list[str]]:
+    """Gửi yêu cầu đổi món ăn của người dùng cho Gemini"""
+    
+    prompt = f"""
+    Bạn là một siêu đầu bếp. Khách hàng đang có các nguyên liệu: {', '.join(ingredients_list)}.
+    Bạn vừa gợi ý món "{current_recipe}" nhưng khách hàng phản hồi: "{user_message}".
+    
+    Hãy gợi ý NGAY một món ăn mới cực kỳ phù hợp với yêu cầu trên.
+    Trả về kết quả duy nhất dưới dạng JSON nguyên khối (không kèm chữ giải thích bên ngoài) theo cấu trúc:
+    {{
+        "recipeName": "Tên món ăn mới",
+        "instructions": ["Bước 1...", "Bước 2...", "Bước 3..."]
+    }}
+    Lưu ý: Chỉ trả về JSON, ngôn ngữ bằng tiếng Việt.
+    """
+
+    try:
+        # Sử dụng JSON mode của Gemini để ép kiểu trả về
+        response = gemini_model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        # Vì đã có JSON mode, response.text chắc chắn là một JSON string hợp lệ
+        data = json.loads(response.text)
+        
+        return data.get("recipeName", "Món ăn từ AI"), data.get("instructions", [])
+    except Exception as e:
+        print(f"❌ Lỗi gọi Gemini Chat: {e}")
+        return "Lỗi gợi ý món ăn", ["Không thể kết nối với bộ não Gemini lúc này."]

@@ -64,6 +64,7 @@ export function useImageAnalysis() {
     images,
     isLoading,
     resultData,
+    setResultData,
     pickImage,
     openCamera,
     analyzeImage

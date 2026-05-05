@@ -35,6 +35,8 @@ const BASE_URL = getBaseUrl();
 
 const ANALYZE_URL = `${BASE_URL}/analyze`;       // Đường dẫn gửi ảnh cho AI
 const SAVE_RECIPE_URL = `${BASE_URL}/recipes/save`; // Đường dẫn lưu vào Database
+const GET_RECIPES_URL = `${BASE_URL}/recipes/list`; // Đường dẫn lấy danh sách công thức trong Database
+const CHAT_URL = `${BASE_URL}/chat`; // Đường dẫn chatbot
 
 // GỬI ẢNH LÊN CHO AI PHÂN TÍCH
 export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalysisResult> => {
@@ -110,3 +112,84 @@ export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promis
     return false; // Báo hiệu lưu thất bại
   }
 };
+
+// Gửi yêu cầu đổi món cho đầu bếp AI
+export const requestNewRecipe = async (
+  ingredients: string[],
+  currentRecipe: string,
+  userMessage: string
+): Promise<AIAnalysisResult | null> => {
+  try {
+    console.log(`💬 Đang yêu cầu AI đổi món: "${userMessage}"...`);
+    const response = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ingredients: ingredients,
+        current_recipe: currentRecipe,
+        user_message: userMessage
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Server AI chat đang lỗi');
+    }
+
+    const data = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error("❌ Lỗi Chat AI:", error);
+    return null;
+  }
+};
+
+// LẤY DANH SÁCH CÔNG THỨC TRONG SỔ TAY
+export const getSavedRecipes = async () => {
+  try {
+    console.log("📖 Đang tải Sổ tay nấu ăn...");
+    const response = await fetch(GET_RECIPES_URL);
+
+    if (!response.ok) {
+      throw new Error('Server từ chối cung cấp dữ liệu');
+    }
+
+    const data = await response.json();
+    // Ánh xạ (Map) dữ liệu từ Database sang đúng chuẩn của UI
+    return data.map((item: any) => ({
+      id: item.id.toString(), // Chuyển ID số của DB thành chuỗi
+      recipeName: item.recipe_name, // Chuyển recipe_name thành recipeName
+      ingredients: item.ingredients,
+      instructions: item.instructions,
+      // Định dạng lại ngày giờ cho đẹp (VD: 05/05/2026)
+      savedAt: new Date(item.created_at).toLocaleDateString('vi-VN')
+    }));
+  } catch (error) {
+    console.error("❌ Lỗi khi tải Sổ tay:", error);
+    return []; // Bị lỗi thì trả về mảng rỗng để App không bị crash
+  }
+}
+
+// Hàm XÓA công thức khỏi Database
+export const deleteRecipe = async (id: string): Promise<boolean> => {
+  try {
+    // Gọi API xóa với method DELETE
+    console.log("🗑️ Đang yêu cầu Server xóa công thức ID:", id);
+    const response = await fetch(`${BASE_URL}/recipes/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Server từ chối xóa dữ liệu');
+    }
+
+    console.log("✅ Server đã xác nhận xóa thành công!");
+    return true;
+
+  } catch (error) {
+    console.error("❌ Lỗi khi xóa công thức:", error);
+    return false;
+  }
+}

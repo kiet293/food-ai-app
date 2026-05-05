@@ -1,22 +1,48 @@
-import React from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView } from 'react-native';
-import { saveRecipeToDatabase, AIAnalysisResult } from '../services/aiService';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { saveRecipeToDatabase, requestNewRecipe, AIAnalysisResult } from '../services/aiService';
 
 
 interface AnalysisResultProps {
   isLoading: boolean;
   resultData: AIAnalysisResult | null;
+  onUpdateResult: (newData: AIAnalysisResult) => void; // Thêm Prop này để cập nhật UI
 }
 
-export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resultData }) => {
+export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resultData, onUpdateResult }) => {
+  // State quản lý việc nhắn tin
+  const [customMessage, setCustomMessage] = useState("");
+  const [isChatting, setIsChatting] = useState(false);
+
   const handleSaveRecipe = async () => {
     if (resultData) {
       const isSuccess = await saveRecipeToDatabase(resultData);
       if (isSuccess) {
         Alert.alert("Thành công! 🎉", "Đã lưu công thức vào máy.");
       } else {
-        Alert.alert("Lỗi", "Không thể lưu lúc này.");
+        Alert.alert("Lỗi 😢", "Không thể lưu lúc này. Hãy kiểm tra lại kết nối Server.");
       }
+    }
+  };
+
+  // Hàm xử lý gửi tin nhắn cho AI
+  const handleChat = async (message: string) => {
+    if (!resultData || !message.trim()) return;
+
+    setIsChatting(true);
+    // Rút trích danh sách tên nguyên liệu từ resultData hiện tại
+    const ingredientNames = resultData.ingredients.map(ing => ing.name);
+
+    // Gọi API đổi món
+    const newData = await requestNewRecipe(ingredientNames, resultData.recipeName, message);
+
+    setIsChatting(false);
+    setCustomMessage(""); // Xóa trắng ô nhập
+
+    if (newData) {
+      onUpdateResult(newData); // Cập nhật lại giao diện với món ăn mới
+    } else {
+      Alert.alert("Lỗi kết nối", "Đầu bếp AI đang bận, vui lòng thử lại sau.");
     }
   };
 
@@ -35,7 +61,7 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
     return (
       <ScrollView
         style={styles.resultContainer}
-        showsVerticalScrollIndicator={false} // Ẩn thanh cuộn cho đẹp
+        showsVerticalScrollIndicator={false} // Thêm dòng này để ẩn thanh cuộn cho đẹp
       >
         {/* Phần 1: Nguyên liệu nhận diện được */}
         <View style={styles.section}>
@@ -59,6 +85,45 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
 
         <View style={styles.saveButtonContainer}>
           <Button title="❤️ Lưu công thức này" color="#ff4757" onPress={handleSaveRecipe} />
+        </View>
+
+        {/* PHẦN 3: KHU VỰC TRỢ LÝ ĐẦU BẾP (TÍNH NĂNG MỚI) */}
+        <View style={styles.chatSection}>
+          <Text style={styles.chatTitle}>🤖 Chưa ưng ý? Yêu cầu món khác:</Text>
+
+          {/* Nút gợi ý nhanh */}
+          <View style={styles.chipContainer}>
+            <TouchableOpacity style={styles.chip} onPress={() => handleChat("Đổi món ăn nào có nhiều nước (nấu canh/súp)")}>
+              <Text style={styles.chipText}>🍜 Món nước</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chip} onPress={() => handleChat("Đổi sang món chiên hoặc xào mặn")}>
+              <Text style={styles.chipText}>🍳 Chiên/Xào</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chip} onPress={() => handleChat("Đổi sang một món chay, hoặc món healthy")}>
+              <Text style={styles.chipText}>🥗 Món Healthy</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Ô nhập yêu cầu tự do */}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.chatInput}
+              placeholder="Hoặc nhập yêu cầu riêng của bạn..."
+              value={customMessage}
+              onChangeText={setCustomMessage}
+            />
+            <TouchableOpacity
+              style={styles.sendButton}
+              onPress={() => handleChat(customMessage)}
+              disabled={isChatting}
+            >
+              {isChatting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.sendButtonText}>Gửi</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Thêm một khoảng trống nhỏ ở cuối để nút không bị dính chặt vào đáy màn hình */}
@@ -123,5 +188,65 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 8,
     overflow: 'hidden', // Để bo góc nút Button trên Android
+  },
+  // CSS cho phần Trợ lý Đầu bếp
+  chatSection: {
+    backgroundColor: "#f0f4f8",
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d9e2ec",
+    marginTop: 10,
+  },
+  chatTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#334e68",
+    marginBottom: 12,
+  },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8, // Khoảng cách giữa các nút
+    marginBottom: 12,
+  },
+  chip: {
+    backgroundColor: "#e2e8f0",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  chipText: {
+    color: "#4a5568",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#cbd5e0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  sendButton: {
+    backgroundColor: "#3182ce",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sendButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
   }
 });

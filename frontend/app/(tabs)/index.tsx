@@ -10,6 +10,7 @@ export default function HomeScreen() {
     images,
     isLoading,
     resultData,
+    setResultData,
     pickImage,
     openCamera,
     analyzeImage,
@@ -34,7 +35,7 @@ export default function HomeScreen() {
           />
         )}
 
-        <AnalysisResult isLoading={isLoading} resultData={resultData} />
+        <AnalysisResult isLoading={isLoading} resultData={resultData} onUpdateResult={setResultData} />
       </ScrollView>
     </SafeAreaView>
   );

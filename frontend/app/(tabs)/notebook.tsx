@@ -12,7 +12,7 @@ import {
   View
 } from 'react-native';
 import { AIAnalysisResult } from '../../services/aiService';
-import { deleteRecipe, getSavedRecipes } from '../../services/storageService';
+import { deleteRecipe, getSavedRecipes } from '../../services/aiService';
 
 // Định nghĩa kiểu dữ liệu mở rộng cho món đã lưu (có thêm id và ngày lưu)
 interface SavedRecipe extends AIAnalysisResult {

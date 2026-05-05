@@ -32,3 +32,39 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db)):
         db.rollback() # Nếu lỗi thì hoàn tác, không làm hỏng Database
         print(f"❌ Lỗi khi lưu DB: {e}")
         raise HTTPException(status_code=500, detail="Không thể lưu vào CSDL")
+
+# api lấy danh sách công thức nấu ăn từ database
+@router.get("/list")
+def get_all_recipes(db: Session = Depends(get_db)):
+    try:
+        # Lấy tất cả các món, sắp xếp mới nhất xuống dưới cùng (tăng dần)
+        recipes = db.query(RecipeDB).order_by(RecipeDB.id.desc()).all()
+        
+        print(f"📖 Đã xuất kho {len(recipes)} công thức cho Sổ tay!")
+        # Trả về đúng định dạng JSON mà App đã khai báo
+        return recipes
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy danh sách Sổ tay: {e}")
+        raise HTTPException(status_code=500, detail="Không thể tải danh sách công thức")
+
+# api xóa công thức nấu ăn khỏi database
+@router.delete("/{recipe_id}")
+def delete_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    try:
+        # tìm công thức trong DB
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        # nếu không tìm thấy công thức
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Không tìm thấy công thức")
+        # xóa công thức
+        db.delete(recipe)
+        # commit để lưu thay đổi
+        db.commit()
+        
+        print(f"🗑️ Đã xóa công thức: {recipe.recipe_name}")
+        return {"message": "Đã xóa công thức thành công"}
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi khi xóa công thức: {e}")
+        raise HTTPException(status_code=500, detail="Không thể xóa công thức")
+
