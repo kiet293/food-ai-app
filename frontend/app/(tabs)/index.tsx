@@ -1,5 +1,5 @@
-import React from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ActionButtons } from "../../components/ActionButtons";
 import { AnalysisResult } from "../../components/AnalysisResult";
 import { ImagePreview } from "../../components/ImagePreview";
@@ -19,24 +19,37 @@ export default function HomeScreen() {
   return (
     // SafeAreaView giúp nội dung không bị lẹm vào tai thỏ (Notch) của iPhone
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false} // Ẩn thanh cuộn cho đẹp
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Text style={styles.title}>🍳 Nhận diện Nguyên liệu</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          // Bí kíp để bấm nút Gửi lúc bàn phím đang mở không bị lỗi nhịp
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <Text style={styles.title}>🍳 Nhận diện Nguyên liệu</Text>
 
-        <ActionButtons onOpenCamera={openCamera} onPickImage={pickImage} />
+          <ActionButtons onOpenCamera={openCamera} onPickImage={pickImage} />
 
-        {images.length > 0 && (
-          <ImagePreview
-            imageUris={images}
+          {images.length > 0 && (
+            <ImagePreview
+              imageUris={images}
+              isLoading={isLoading}
+              onAnalyze={analyzeImage}
+            />
+          )}
+
+          <AnalysisResult
             isLoading={isLoading}
-            onAnalyze={analyzeImage}
+            resultData={resultData}
+            onUpdateResult={setResultData}
           />
-        )}
-
-        <AnalysisResult isLoading={isLoading} resultData={resultData} onUpdateResult={setResultData} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -47,10 +60,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f5f5",
   },
   scrollContainer: {
-    flexGrow: 1, // flexGrow quan trọng hơn flex trong ScrollView, giúp nó giãn hết màn hình nếu nội dung ngắn
+    flexGrow: 1,
     alignItems: "center",
     padding: 20,
-    paddingBottom: 40, // Thêm khoảng trống ở đáy để khi cuộn xuống cùng không bị sát viền
+    paddingBottom: 40,
   },
   title: {
     fontSize: 24,
@@ -59,4 +72,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#333",
   },
+  // Thêm style cho màn hình chờ
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+  }
 });

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import {
+  ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, SafeAreaView
+} from 'react-native';
 import { saveRecipeToDatabase, requestNewRecipe, AIAnalysisResult } from '../services/aiService';
 
 
@@ -15,13 +17,17 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
   const [isChatting, setIsChatting] = useState(false);
 
   const handleSaveRecipe = async () => {
-    if (resultData) {
-      const isSuccess = await saveRecipeToDatabase(resultData);
-      if (isSuccess) {
-        Alert.alert("Thành công! 🎉", "Đã lưu công thức vào máy.");
-      } else {
-        Alert.alert("Lỗi 😢", "Không thể lưu lúc này. Hãy kiểm tra lại kết nối Server.");
-      }
+    if (!resultData) return;
+
+    try {
+      // Gọi hàm lưu. Nếu không có lỗi gì xảy ra, nó sẽ chạy thẳng xuống dòng Alert Thành công
+      await saveRecipeToDatabase(resultData);
+      Alert.alert("Thành công! 🎉", "Đã lưu công thức vào máy.");
+
+    } catch (error: any) {
+      // Nếu Backend ném lỗi (ví dụ: lỗi 400 trùng lặp), nó sẽ nhảy ngay vào đây!
+      // error.message chính là câu "Món ăn này đã có trong Sổ tay..." từ Server
+      Alert.alert("Thông báo", error.message || "Không thể lưu lúc này. Hãy kiểm tra lại kết nối Server.");
     }
   };
 
@@ -59,10 +65,7 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
 
   if (resultData) {
     return (
-      <ScrollView
-        style={styles.resultContainer}
-        showsVerticalScrollIndicator={false} // Thêm dòng này để ẩn thanh cuộn cho đẹp
-      >
+      <View style={styles.resultContainer}>
         {/* Phần 1: Nguyên liệu nhận diện được */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🛒 Nguyên liệu phát hiện:</Text>
@@ -128,7 +131,7 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
 
         {/* Thêm một khoảng trống nhỏ ở cuối để nút không bị dính chặt vào đáy màn hình */}
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </View>
     );
   }
 

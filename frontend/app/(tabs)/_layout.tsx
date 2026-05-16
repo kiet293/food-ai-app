@@ -1,14 +1,41 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
+import { getToken } from '@/services/authService';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await getToken();
+        if (!token) {
+          router.replace('/login');
+        }
+      } catch (error) {
+        console.error("Lỗi kiểm tra token:", error);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  if (isChecking) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#28a745" />
+      </View>
+    );
+  }
 
   return (
     <Tabs
@@ -32,6 +59,15 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => (
             // 2. Đổi icon thành hình cuốn sổ hoặc trái tim cho đúng ý nghĩa
             <IconSymbol size={28} name="book.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Tài khoản',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person.fill" color={color} />
           ),
         }}
       />

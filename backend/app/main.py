@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import ai_route, recipe_route
 from app.models import database, recipe_model
+from app.routes import ai_route, recipe_route, auth_route
 
 app = FastAPI(title="Food AI Backend")
 
 # Tự động tạo bảng trong PostgreSQL nếu chưa có
-recipe_model.Base.metadata.create_all(bind=database.engine)
+database.Base.metadata.create_all(bind=database.engine)
 
 # Xử lý CORS
 app.add_middleware(
@@ -18,6 +18,7 @@ app.add_middleware(
 )
 
 # Đăng ký nhóm API từ thư mục routes vào đường dẫn gốc /api
+app.include_router(auth_route.router, prefix="/api/auth", tags=["Authentication"]) # <--- Đăng ký API
 app.include_router(ai_route.router, prefix="/api", tags=["AI Analysis"])
 app.include_router(recipe_route.router, prefix="/api/recipes", tags=["Recipe Management"])
 

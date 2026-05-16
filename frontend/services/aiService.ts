@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { getToken } from './authService';
 
 // cấu trúc dữ liệu
 export interface AIAnalysisResult {
@@ -91,25 +92,30 @@ export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalys
 export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promise<boolean> => {
   try {
     console.log("💾 Đang gửi yêu cầu lưu công thức...");
+    const token = await getToken();
     const response = await fetch(SAVE_RECIPE_URL, { // Sử dụng SAVE_RECIPE_URL
       method: 'POST',
       headers: {
         'Content-Type': 'application/json', // Lưu ý: Chỗ này BẮT BUỘC phải có Content-Type là JSON
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(recipeData), // Biến Object thành chuỗi JSON để gửi đi
     });
 
     if (!response.ok) {
-      throw new Error('Server từ chối lưu dữ liệu');
+      // 1. MỞ KHÓA LỖI: Bóc tách gói JSON báo lỗi từ FastAPI (nằm trong trường "detail")
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Server từ chối lưu dữ liệu');
     }
 
     const result = await response.json();
     console.log("✅ Server phản hồi:", result.message);
     return true; // Báo hiệu lưu thành công
 
-  } catch (error) {
-    console.error("❌ Lỗi khi lưu công thức:", error);
-    return false; // Báo hiệu lưu thất bại
+  } catch (error: any) {
+    console.error("❌ Lỗi khi lưu công thức:", error.message);
+    // Ném thẳng lỗi này ra ngoài cho giao diện (AnalysisResult) xử lý
+    throw error;
   }
 };
 
@@ -150,7 +156,12 @@ export const requestNewRecipe = async (
 export const getSavedRecipes = async () => {
   try {
     console.log("📖 Đang tải Sổ tay nấu ăn...");
-    const response = await fetch(GET_RECIPES_URL);
+    const token = await getToken();
+    const response = await fetch(GET_RECIPES_URL, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
     if (!response.ok) {
       throw new Error('Server từ chối cung cấp dữ liệu');
@@ -177,8 +188,12 @@ export const deleteRecipe = async (id: string): Promise<boolean> => {
   try {
     // Gọi API xóa với method DELETE
     console.log("🗑️ Đang yêu cầu Server xóa công thức ID:", id);
+    const token = await getToken();
     const response = await fetch(`${BASE_URL}/recipes/${id}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (!response.ok) {

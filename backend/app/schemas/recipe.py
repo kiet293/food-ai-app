@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 from typing import List
 
@@ -10,6 +11,7 @@ class AIAnalysisResult(BaseModel):
     ingredients: List[Ingredient]
     recipeName: str
     instructions: List[str]
+    imageUrl: Optional[str] = None
 
 class RecipeChatRequest(BaseModel):
     ingredients: List[str] # Danh sách nguyên liệu App đang có
