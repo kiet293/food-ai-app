@@ -9,7 +9,8 @@ import {
   ScrollView,
   StyleSheet, Text,
   TouchableOpacity,
-  View
+  View,
+  Image
 } from 'react-native';
 import { AIAnalysisResult } from '../../services/aiService';
 import { deleteRecipe, getSavedRecipes } from '../../services/aiService';
@@ -113,6 +114,14 @@ export default function NotebookScreen() {
 
                 {/* Dùng ScrollView để lỡ công thức dài thì vuốt cuộn được */}
                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+
+                  {selectedRecipe.imageUrl && (
+                    <Image
+                      source={{ uri: selectedRecipe.imageUrl }}
+                      style={styles.recipeImage}
+                      resizeMode="cover"
+                    />
+                  )}
 
                   <Text style={styles.sectionTitle}>🛒 Nguyên liệu:</Text>
                   {selectedRecipe.ingredients.map((item, index) => (
@@ -235,5 +244,12 @@ const styles = StyleSheet.create({
   itemText: { fontSize: 16, color: '#444', marginBottom: 4 },
   divider: { height: 1, backgroundColor: '#eee', marginVertical: 15 },
   stepText: { fontSize: 16, lineHeight: 24, color: '#444', marginBottom: 10 },
-  closeButtonContainer: { marginTop: 15, borderRadius: 8, overflow: 'hidden' }
+  closeButtonContainer: { marginTop: 15, borderRadius: 8, overflow: 'hidden' },
+  recipeImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    marginVertical: 12,
+    backgroundColor: '#e1e4e6',
+  }
 });

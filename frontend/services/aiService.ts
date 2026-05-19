@@ -6,6 +6,7 @@ export interface AIAnalysisResult {
   ingredients: Array<{ name: string; probability: number }>;
   recipeName: string;
   instructions: string[];
+  imageUrl?: string;
 }
 
 // Hàm tự động bắt IP máy tính
@@ -174,6 +175,7 @@ export const getSavedRecipes = async () => {
       recipeName: item.recipe_name, // Chuyển recipe_name thành recipeName
       ingredients: item.ingredients,
       instructions: item.instructions,
+      imageUrl: item.image_url,
       // Định dạng lại ngày giờ cho đẹp (VD: 05/05/2026)
       savedAt: new Date(item.created_at).toLocaleDateString('vi-VN')
     }));

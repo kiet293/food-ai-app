@@ -30,7 +30,8 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
             user_id=current_user.id,
             recipe_name=recipe_data.recipeName,
             ingredients=ingredients_list,
-            instructions=recipe_data.instructions
+            instructions=recipe_data.instructions,
+            image_url=recipe_data.imageUrl
         )
 
         # Lưu vào Database

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, SafeAreaView
+  ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, SafeAreaView, Image
 } from 'react-native';
 import { saveRecipeToDatabase, requestNewRecipe, AIAnalysisResult } from '../services/aiService';
 
@@ -80,6 +80,16 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
         {/* Phần 2: Đề xuất món ăn & Công thức */}
         <View style={[styles.section, styles.recipeSection]}>
           <Text style={styles.sectionTitle}>🍲 Gợi ý: {resultData.recipeName}</Text>
+
+          {/* Hiển thị ảnh món ăn vừa tìm được */}
+          {resultData.imageUrl && (
+            <Image
+              source={{ uri: resultData.imageUrl }}
+              style={styles.recipeImage}
+              resizeMode="cover"
+            />
+          )}
+
           <View style={styles.divider} />
           {resultData.instructions.map((step, index) => (
             <Text key={index} style={styles.stepText}>{step}</Text>
@@ -251,5 +261,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 15,
-  }
+  },
+
+  recipeImage: {
+    width: '100%',
+    height: 200,          // Chiều cao bức ảnh cố định 200px nhìn rất sang
+    borderRadius: 10,     // Bo nhẹ góc ảnh cho đồng bộ với cái card
+    marginVertical: 12,   // Cách trên cách dưới một khoảng vừa vặn
+    backgroundColor: '#e1e4e6', // Màu nền xám nhạt hiện lên lúc ảnh đang load mạng chậm
+  },
 });

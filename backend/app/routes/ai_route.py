@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File
 from typing import List
+import httpx
 from app.schemas.recipe import AIAnalysisResult
 from app.ai.yolo_service import analyze_food_image, ask_gemini_for_recipe
 from app.schemas.recipe import RecipeChatRequest
@@ -7,6 +8,25 @@ from app.ai.yolo_service import ask_gemini_for_new_recipe
 
 # Khởi tạo Router thay vì dùng app
 router = APIRouter()
+
+PEXELS_API_KEY = "UPgnazTcU7NR8u5c0lnB2VLGgjRnzivrw5ok58JoKcmYtAtl4MXmzLbW"
+
+async def fetch_food_image_url(query_name: str) -> str:
+    """Hàm tự động mang tên món ăn lên Pexels để tìm 1 tấm ảnh đẹp nhất"""
+    url = f"https://api.pexels.com/v1/search?query={query_name}&per_page=1"
+    headers = {"Authorization": PEXELS_API_KEY}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("photos") and len(data["photos"]) > 0:
+                    return data["photos"][0]["src"]["medium"]
+    except Exception as e:
+        print(f"⚠️ Không thể lấy ảnh từ Pexels do lỗi: {e}")
+    
+    return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500"
 
 # API này khi ghép vào main sẽ thành /api/analyze
 @router.post("/analyze", response_model=AIAnalysisResult)
@@ -32,11 +52,14 @@ async def analyze_image(image_files: List[UploadFile] = File(...)):
     ing_names_for_gemini = [i.name for i in all_detected_ingredients]
     recipe_name, instructions = ask_gemini_for_recipe(ing_names_for_gemini)
 
-    print("📤 Đã phân tích xong, trả kết quả về App!")
+    image_url = await fetch_food_image_url(recipe_name)
+
+    print(f"📤 Đã phân tích xong món '{recipe_name}', trả kết quả kèm ảnh về App!")
     return AIAnalysisResult(
         ingredients=all_detected_ingredients,
         recipeName=recipe_name,
-        instructions=instructions
+        instructions=instructions,
+        imageUrl=image_url
     )
 
 @router.post("/chat", response_model=AIAnalysisResult)
@@ -50,6 +73,8 @@ async def chat_for_new_recipe(request: RecipeChatRequest):
         user_message=request.user_message
     )
 
+    image_url = await fetch_food_image_url(recipe_name)
+
     # 2. Đóng gói lại đúng format AIAnalysisResult để trả về App
     # Vì App cần hiển thị danh sách nguyên liệu và % nhận diện (probability),
     # ta sẽ trả lại danh sách tên nguyên liệu cũ với % giả định là 100 để UI không bị vỡ.
@@ -59,5 +84,6 @@ async def chat_for_new_recipe(request: RecipeChatRequest):
     return AIAnalysisResult(
         ingredients=fake_ingredients,
         recipeName=recipe_name,
-        instructions=instructions
+        instructions=instructions,
+        imageUrl=image_url
     )
