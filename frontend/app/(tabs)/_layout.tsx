@@ -52,6 +52,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="popular"
+        options={{
+          title: 'Xu hướng',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="flame.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notebook"
         options={{
           title: 'Sổ tay', // 1. Đổi tên hiển thị trên thanh Tab ở dưới cùng

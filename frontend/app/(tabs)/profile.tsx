@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard
+  SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, StatusBar
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getUserProfile, logoutUser, updateUserProfile } from '../../services/authService';
@@ -210,6 +210,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   headerTitle: {
     fontSize: 26,

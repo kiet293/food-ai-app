@@ -1,10 +1,21 @@
 import Constants from 'expo-constants';
 import { getToken } from './authService';
 
-// cấu trúc dữ liệu
+// cấu trúc dữ liệu cho phân tích món ăn
 export interface AIAnalysisResult {
   ingredients: Array<{ name: string; probability: number }>;
   recipeName: string;
+  instructions: string[];
+  imageUrl?: string;
+}
+
+// Cấu trúc dữ liệu cho món ăn phổ biến
+export interface PopularRecipe {
+  id: string;
+  recipeName: string;
+  scanCount: number;
+  saveCount: number;
+  ingredients: Array<{ name: string; probability: number }>;
   instructions: string[];
   imageUrl?: string;
 }
@@ -35,10 +46,13 @@ const BASE_URL = getBaseUrl();
 // Cách 3: Dùng ngrok
 //const BASE_URL = 'https://spoiling-decorator-polish.ngrok-free.dev/api';
 
-const ANALYZE_URL = `${BASE_URL}/analyze`;       // Đường dẫn gửi ảnh cho AI
-const SAVE_RECIPE_URL = `${BASE_URL}/recipes/save`; // Đường dẫn lưu vào Database
-const GET_RECIPES_URL = `${BASE_URL}/recipes/list`; // Đường dẫn lấy danh sách công thức trong Database
-const CHAT_URL = `${BASE_URL}/chat`; // Đường dẫn chatbot
+// const ANALYZE_URL = `${BASE_URL}/analyze`;       // Đường dẫn gửi ảnh cho AI
+// const SAVE_RECIPE_URL = `${BASE_URL}/recipes/save`; // Đường dẫn lưu vào Database
+// const GET_RECIPES_URL = `${BASE_URL}/recipes/list`; // Đường dẫn lấy danh sách công thức trong Database
+// const CHAT_URL = `${BASE_URL}/chat`; // Đường dẫn chatbot
+
+const API_AI = `${BASE_URL}/ai`;
+const API_RECIPES = `${BASE_URL}/recipes`;
 
 // GỬI ẢNH LÊN CHO AI PHÂN TÍCH
 export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalysisResult> => {
@@ -62,7 +76,7 @@ export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalys
 
     // 3. Gọi anh shipper chở hàng đi
     console.log("🚀 Đang gửi", imageUris.length, "bức ảnh lên Server...");
-    const response = await fetch(ANALYZE_URL, {
+    const response = await fetch(`${API_AI}/analyze`, {
       method: 'POST',
       body: formData,
       // React Native sẽ tự động tạo Content-Type kèm boundary (dấu phân cách file)
@@ -89,12 +103,45 @@ export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalys
   }
 };
 
+// Gửi yêu cầu đổi món cho đầu bếp AI
+export const requestNewRecipe = async (
+  ingredients: string[],
+  currentRecipe: string,
+  userMessage: string
+): Promise<AIAnalysisResult | null> => {
+  try {
+    console.log(`💬 Đang yêu cầu AI đổi món: "${userMessage}"...`);
+    const response = await fetch(`${API_AI}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ingredients: ingredients,
+        current_recipe: currentRecipe,
+        user_message: userMessage
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Server AI chat đang lỗi');
+    }
+
+    const data = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error("❌ Lỗi Chat AI:", error);
+    return null;
+  }
+};
+
 // LƯU CÔNG THỨC VÀO DATABASE
 export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promise<boolean> => {
   try {
     console.log("💾 Đang gửi yêu cầu lưu công thức...");
     const token = await getToken();
-    const response = await fetch(SAVE_RECIPE_URL, { // Sử dụng SAVE_RECIPE_URL
+    const response = await fetch(`${API_RECIPES}/save`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json', // Lưu ý: Chỗ này BẮT BUỘC phải có Content-Type là JSON
@@ -120,45 +167,12 @@ export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promis
   }
 };
 
-// Gửi yêu cầu đổi món cho đầu bếp AI
-export const requestNewRecipe = async (
-  ingredients: string[],
-  currentRecipe: string,
-  userMessage: string
-): Promise<AIAnalysisResult | null> => {
-  try {
-    console.log(`💬 Đang yêu cầu AI đổi món: "${userMessage}"...`);
-    const response = await fetch(CHAT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ingredients: ingredients,
-        current_recipe: currentRecipe,
-        user_message: userMessage
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Server AI chat đang lỗi');
-    }
-
-    const data = await response.json();
-    return data;
-
-  } catch (error) {
-    console.error("❌ Lỗi Chat AI:", error);
-    return null;
-  }
-};
-
 // LẤY DANH SÁCH CÔNG THỨC TRONG SỔ TAY
 export const getSavedRecipes = async () => {
   try {
     console.log("📖 Đang tải Sổ tay nấu ăn...");
     const token = await getToken();
-    const response = await fetch(GET_RECIPES_URL, {
+    const response = await fetch(`${API_RECIPES}/list`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -191,7 +205,7 @@ export const deleteRecipe = async (id: string): Promise<boolean> => {
     // Gọi API xóa với method DELETE
     console.log("🗑️ Đang yêu cầu Server xóa công thức ID:", id);
     const token = await getToken();
-    const response = await fetch(`${BASE_URL}/recipes/${id}`, {
+    const response = await fetch(`${API_RECIPES}/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -209,4 +223,30 @@ export const deleteRecipe = async (id: string): Promise<boolean> => {
     console.error("❌ Lỗi khi xóa công thức:", error);
     return false;
   }
-}
+};
+
+// LẤY DANH SÁCH 10 MÓN ĂN PHỔ BIẾN
+export const getPopularRecipes = async (): Promise<PopularRecipe[]> => {
+  try {
+    console.log("🔥 Đang tải danh sách món ăn phổ biến...");
+    const response = await fetch(`${API_RECIPES}/popular`);
+
+    if (!response.ok) {
+      throw new Error('Server từ chối cung cấp dữ liệu xu hướng');
+    }
+
+    const data = await response.json();
+    return data.map((item: any) => ({
+      id: item.id.toString(),
+      recipeName: item.recipe_name,
+      scanCount: item.scan_count,
+      saveCount: item.save_count,
+      ingredients: item.ingredients,
+      instructions: item.instructions,
+      imageUrl: item.image_url,
+    }));
+  } catch (error) {
+    console.error("❌ Lỗi khi tải danh sách phổ biến:", error);
+    return [];
+  }
+};

@@ -25,3 +25,26 @@ class RecipeDB(Base):
     
     # Tự động lưu thời gian tạo
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RecipeStatsDB(Base):
+    __tablename__ = "recipe_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Tên món ăn (Unique để tăng đếm theo tên món)
+    recipe_name = Column(String, unique=True, index=True)
+    
+    # Số lần AI gợi ý món ăn này
+    scan_count = Column(Integer, default=0)
+    
+    # Số lần người dùng bấm lưu món ăn này
+    save_count = Column(Integer, default=0)
+    
+    # Các trường dữ liệu bổ sung để hiển thị trực tiếp từ bảng xếp hạng
+    ingredients = Column(JSON)
+    instructions = Column(JSON)
+    image_url = Column(String, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

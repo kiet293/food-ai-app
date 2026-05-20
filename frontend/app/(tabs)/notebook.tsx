@@ -10,7 +10,9 @@ import {
   StyleSheet, Text,
   TouchableOpacity,
   View,
-  Image
+  Image,
+  Platform,
+  StatusBar
 } from 'react-native';
 import { AIAnalysisResult } from '../../services/aiService';
 import { deleteRecipe, getSavedRecipes } from '../../services/aiService';
@@ -155,6 +157,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   headerTitle: {
     fontSize: 26,

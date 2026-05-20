@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CỤM DATABASE (POSTGRESQL)
+  # ==========================================
+  db:
+    image: postgres:15-alpine
+    container_name: food_ai_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456 # Đặt pass cho DB
+      POSTGRES_DB: food_app_db # Tên Database
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Lưu dữ liệu cứng, tắt Docker không bị mất
+
+  # ==========================================
+  # 2. CỤM BACKEND (FASTAPI)
+  # ==========================================
+  api:
+    build: .
+    container_name: food_ai_api
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app # CỬA SỔ THẦN KỲ: Ánh xạ thư mục code bên ngoài vào thẳng Docker
+    environment:
+      # Truyền đường dẫn kết nối DB cho FastAPI
+      - DATABASE_URL=postgresql://postgres:123456@db:5432/food_app_db
+    depends_on:
+      - db # Chờ Database khởi động xong mới được chạy API
+
+volumes:
+  postgres_data:

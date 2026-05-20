@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View, StatusBar } from "react-native";
 import { ActionButtons } from "../../components/ActionButtons";
 import { AnalysisResult } from "../../components/AnalysisResult";
 import { ImagePreview } from "../../components/ImagePreview";
@@ -58,6 +58,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   scrollContainer: {
     flexGrow: 1,
