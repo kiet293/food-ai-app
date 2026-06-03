@@ -120,3 +120,61 @@ def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, 
     except Exception as e:
         print(f"❌ Lỗi gọi Gemini Chat: {e}")
         return "Lỗi gợi ý món ăn", ["Không thể kết nối với bộ não Gemini lúc này."]
+
+
+def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
+    """Gửi nguyên liệu cho Gemini và lấy danh sách nhiều công thức gợi ý"""
+    if not ingredients_list:
+        return []
+
+    prompt = f"""
+    Đóng vai trò là một Siêu đầu bếp chuyên gia ẩm thực Việt Nam.
+    Người dùng chưa đi chợ hoặc muốn nấu ăn từ danh sách các nguyên liệu sau: {', '.join(ingredients_list)}.
+    
+    Nhiệm vụ của bạn:
+    1. Gợi ý 3 món ăn khác nhau (có thể là món canh, món xào, món kho, v.v.) có thể nấu từ một số hoặc tất cả các nguyên liệu trên.
+    2. Bạn được phép giả định trong bếp đã có sẵn các gia vị cơ bản (mắm, muối, tiêu, đường, dầu ăn, hành tỏi, v.v.).
+    3. Các món ăn nên thực tế, ngon miệng và phổ biến trong mâm cơm Việt Nam.
+    4. Đối với mỗi món ăn, hãy chỉ rõ các nguyên liệu cần thiết (bao gồm cả nguyên liệu từ danh sách trên và một số nguyên liệu phụ phổ biến khác nếu cần) và hướng dẫn nấu chi tiết.
+    
+    Yêu cầu ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Chỉ trả về chuỗi JSON chuẩn chứa danh sách các món ăn, không giải thích gì thêm):
+    {{
+        "recipes": [
+            {{
+                "recipeName": "Tên món ăn 1 (Ví dụ: Canh cà chua trứng)",
+                "ingredients": ["cà chua", "trứng", "hành lá"],
+                "instructions": [
+                    "Bước 1: Sơ chế...",
+                    "Bước 2: Nấu canh...",
+                    "Bước 3: Hoàn thiện..."
+                ]
+            }},
+            {{
+                "recipeName": "Tên món ăn 2 (Ví dụ: Trứng đúc thịt)",
+                "ingredients": ["trứng", "thịt heo băm", "hành khô"],
+                "instructions": [
+                    "Bước 1: Sơ chế...",
+                    "Bước 2: Chiên trứng...",
+                    "Bước 3: Hoàn thiện..."
+                ]
+            }},
+            {{
+                "recipeName": "Tên món ăn 3...",
+                "ingredients": [],
+                "instructions": []
+            }}
+        ]
+    }}
+    """
+
+    try:
+        response = gemini_model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        data = json.loads(response.text)
+        return data.get("recipes", [])
+    except Exception as e:
+        print(f"❌ Lỗi gọi Gemini gợi ý nhiều món: {e}")
+        return []

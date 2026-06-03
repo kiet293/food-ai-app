@@ -13,7 +13,9 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { AnalysisResult } from '@/components/AnalysisResult';
 import { useImageAnalysis } from '@/hooks/useImageAnalysis';
@@ -46,19 +48,22 @@ export default function ModalScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#f6f3ea" />
 
       <View style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.headerAction}>
-            <Text style={styles.headerActionText}>←</Text>
+          <Pressable onPress={() => router.back()} style={styles.headerAction} hitSlop={10}>
+            <MaterialIcons name="arrow-back" size={24} color="#1a3a1a" />
           </Pressable>
 
           <View style={styles.headerTextWrap}>
             <Text style={styles.title}>Thêm ảnh nguyên liệu</Text>
-            <Text style={styles.subtitle}>Chụp ảnh hoặc tải nhiều ảnh lên trước khi phân tích</Text>
+            <Text style={styles.subtitle}>Chụp ảnh hoặc chọn từ album của bạn</Text>
           </View>
 
-          <Pressable onPress={clearImages} style={styles.headerAction}>
-            <Text style={styles.headerActionText}>✕</Text>
-          </Pressable>
+          {images.length > 0 && (
+            <Pressable onPress={clearImages} style={[styles.headerAction, styles.clearAction]} hitSlop={10}>
+              <MaterialIcons name="delete-sweep" size={22} color="#ff4757" />
+            </Pressable>
+          )}
         </View>
 
         <ScrollView
@@ -67,20 +72,26 @@ export default function ModalScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Action Grid */}
           <View style={styles.actionGrid}>
             <Pressable style={[styles.actionCard, styles.cameraCard]} onPress={openCamera}>
-              <Text style={styles.actionIcon}>📸</Text>
+              <View style={styles.iconCircleCamera}>
+                <MaterialIcons name="photo-camera" size={32} color="#1a3a1a" />
+              </View>
               <Text style={styles.actionTitle}>Chụp ảnh</Text>
-              <Text style={styles.actionDescription}>Chụp nhanh từng lần, ảnh sẽ được thêm vào danh sách</Text>
+              <Text style={styles.actionDescription}>Quét trực tiếp nguyên liệu thực tế trước mặt bạn</Text>
             </Pressable>
 
             <Pressable style={[styles.actionCard, styles.uploadCard]} onPress={pickImage}>
-              <Text style={styles.actionIcon}>🖼️</Text>
+              <View style={styles.iconCircleUpload}>
+                <MaterialIcons name="photo-library" size={32} color="#7d5010" />
+              </View>
               <Text style={styles.actionTitle}>Tải ảnh lên</Text>
-              <Text style={styles.actionDescription}>Chọn một hoặc nhiều ảnh từ thư viện để phân tích</Text>
+              <Text style={styles.actionDescription}>Chọn nhiều ảnh từ thư viện thiết bị của bạn</Text>
             </Pressable>
           </View>
 
+          {/* Gallery Section */}
           <View style={styles.galleryHeader}>
             <Text style={styles.sectionTitle}>Ảnh đã thêm</Text>
             <Text style={styles.counter}>{images.length} ảnh</Text>
@@ -97,44 +108,52 @@ export default function ModalScreen() {
                 renderItem={({ item, index }) => (
                   <View style={styles.imageWrap}>
                     <Image source={{ uri: item }} style={styles.image} />
-                    <Pressable style={styles.removeButton} onPress={() => removeImage(index)}>
-                      <Text style={styles.removeButtonText}>✕</Text>
+                    <Pressable style={styles.removeButton} onPress={() => removeImage(index)} hitSlop={6}>
+                      <MaterialIcons name="close" size={14} color="#fff" />
                     </Pressable>
                   </View>
                 )}
               />
 
               <View style={styles.galleryActions}>
-                <Pressable style={styles.secondaryButton} onPress={openCamera}>
-                  <Text style={styles.secondaryButtonText}>+ Chụp thêm</Text>
-                </Pressable>
-                <Pressable style={styles.secondaryButton} onPress={pickImage}>
-                  <Text style={styles.secondaryButtonText}>+ Tải thêm</Text>
-                </Pressable>
+                <TouchableOpacity style={styles.galleryActionButton} onPress={openCamera} activeOpacity={0.8}>
+                  <MaterialIcons name="add-a-photo" size={18} color="#1a3a1a" style={styles.buttonIcon} />
+                  <Text style={styles.galleryActionButtonText}>Chụp thêm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.galleryActionButton} onPress={pickImage} activeOpacity={0.8}>
+                  <MaterialIcons name="add-photo-alternate" size={18} color="#1a3a1a" style={styles.buttonIcon} />
+                  <Text style={styles.galleryActionButtonText}>Tải thêm</Text>
+                </TouchableOpacity>
               </View>
 
-              <Pressable
+              <TouchableOpacity
                 style={[styles.analyzeButton, isLoading && styles.analyzeButtonDisabled]}
                 onPress={handleAnalyze}
                 disabled={isLoading}
+                activeOpacity={0.8}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.analyzeButtonText}>Phân tích nguyên liệu</Text>
+                  <Text style={styles.analyzeButtonText}>Phân tích nguyên liệu 🍳</Text>
                 )}
-              </Pressable>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateEmoji}>📷</Text>
-              <Text style={styles.emptyStateTitle}>Chưa có ảnh nào</Text>
-              <Text style={styles.emptyStateText}>Hãy dùng 1 trong 2 nút phía trên để bắt đầu.</Text>
+              <View style={styles.emptyIconCircle}>
+                <MaterialIcons name="image-search" size={42} color="#adc6ad" />
+              </View>
+              <Text style={styles.emptyStateTitle}>Chưa có ảnh nguyên liệu</Text>
+              <Text style={styles.emptyStateText}>
+                Hãy dùng 1 trong 2 nút phía trên để chụp hoặc tải ảnh nguyên liệu lên nhé!
+              </Text>
             </View>
           )}
 
+          {/* Results section */}
           <AnalysisResult
-          
+            isLoading={isLoading}
             resultData={resultData}
             onUpdateResult={setResultData}
           />
@@ -158,201 +177,242 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 14,
     paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8e2d8',
   },
   headerAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#211f1a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowColor: '#1a3a1a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
-  headerActionText: {
-    fontSize: 20,
-    color: '#1f1f1f',
-    fontWeight: '800',
+  clearAction: {
+    backgroundColor: '#fff0f2',
+    borderWidth: 1,
+    borderColor: '#ffccd3',
   },
   headerTextWrap: {
     flex: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
   },
   title: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '900',
-    color: '#111',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1a3a1a',
+    marginBottom: 2,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#6d655c',
+    fontSize: 12,
+    color: '#8aab8a',
   },
   body: {
     flex: 1,
+    backgroundColor: '#f0f4f0',
   },
   bodyContent: {
     paddingHorizontal: 16,
-    paddingBottom: 28,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   actionGrid: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: 16,
   },
   actionCard: {
     flex: 1,
-    minHeight: 150,
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 16,
+    minHeight: 168,
     justifyContent: 'space-between',
-    shadowColor: '#211f1a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    backgroundColor: '#fff',
+    shadowColor: '#1a3a1a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
   cameraCard: {
-    backgroundColor: '#dff3ea',
+    borderWidth: 1,
+    borderColor: '#dff3ea',
+    backgroundColor: '#f7fdfb',
   },
   uploadCard: {
-    backgroundColor: '#f7e8d0',
+    borderWidth: 1,
+    borderColor: '#f7e8d0',
+    backgroundColor: '#fdfbf7',
   },
-  actionIcon: {
-    fontSize: 30,
+  iconCircleCamera: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#dff3ea',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCircleUpload: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f7e8d0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#111',
-    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a3a1a',
+    marginTop: 12,
   },
   actionDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#4b4944',
-    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#6b8f6b',
+    marginTop: 4,
   },
   galleryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 22,
+    marginTop: 8,
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#111',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a3a1a',
   },
   counter: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#7a6f61',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8aab8a',
   },
   galleryCard: {
     backgroundColor: '#fff',
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 14,
-    shadowColor: '#211f1a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    shadowColor: '#1a3a1a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
   galleryList: {
     gap: 12,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   imageWrap: {
     position: 'relative',
+    marginRight: 4,
+    marginTop: 6,
   },
   image: {
-    width: 150,
-    height: 150,
-    borderRadius: 14,
-    backgroundColor: '#eee',
+    width: 110,
+    height: 110,
+    borderRadius: 12,
+    backgroundColor: '#f0f4f0',
   },
   removeButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ff4757',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: -1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   galleryActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 6,
+    marginTop: 12,
   },
-  secondaryButton: {
+  galleryActionButton: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    flexDirection: 'row',
+    backgroundColor: '#f0f4f0',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#dde8dd',
   },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#333',
+  galleryActionButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a3a1a',
+  },
+  buttonIcon: {
+    marginRight: 6,
   },
   analyzeButton: {
-    marginTop: 12,
-    backgroundColor: '#28a745',
+    marginTop: 16,
+    backgroundColor: '#2ecc71',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2ecc71',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   analyzeButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   analyzeButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '700',
   },
   emptyState: {
     backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 28,
+    borderRadius: 16,
+    padding: 32,
     alignItems: 'center',
-    marginTop: 18,
-    shadowColor: '#211f1a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    marginTop: 8,
+    shadowColor: '#1a3a1a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
-  emptyStateEmoji: {
-    fontSize: 34,
-    marginBottom: 8,
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#f0f4f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#111',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1a3a1a',
     marginBottom: 6,
   },
   emptyStateText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#6d655c',
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#8aab8a',
     textAlign: 'center',
   },
 });

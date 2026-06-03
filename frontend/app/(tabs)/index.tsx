@@ -175,13 +175,16 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerRow}>
-            <View style={styles.avatar}>
+            <Pressable 
+              style={styles.avatar}
+              onPress={() => router.push('/(tabs)/profile')}
+            >
               {isAvatarUrl ? (
                 <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarText}>{userAvatar}</Text>
               )}
-            </View>
+            </Pressable>
             <Text style={styles.pageTitle}>Tìm Kiếm</Text>
             <View style={styles.notificationWrap}>
               <Text style={styles.notificationIcon}>🔔</Text>
@@ -189,27 +192,20 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.searchBox}>
-            <Pressable onPress={() => router.push('/search')} hitSlop={8}>
-              <MaterialIcons name="search" size={30} color="#626262" style={styles.searchIcon} />
-            </Pressable>
-            <TextInput
-              placeholder="Gõ vào tên các nguyên liệu..."
-              placeholderTextColor="#8d8d8d"
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              onFocus={() => router.push(`/search?q=${encodeURIComponent(searchText)}`)}
-              onSubmitEditing={() => router.push(`/search?q=${encodeURIComponent(searchText)}`)}
-            />
-          </View>
+          <Pressable 
+            style={styles.searchBox} 
+            onPress={() => router.push('/search')}
+          >
+            <MaterialIcons name="search" size={30} color="#626262" style={styles.searchIcon} />
+            <Text style={styles.searchPlaceholderText}>Gõ vào tên các nguyên liệu...</Text>
+          </Pressable>
 
           {recentItems.length > 0 && (
             <View style={styles.recentList}>
               {recentItems.map((r) => (
                 <View key={r} style={styles.recentRow}>
                   <Text style={styles.recentClock}>🕘</Text>
-                  <Pressable style={styles.recentTextWrap} onPress={() => { setSearchText(r); handleSearch(r); }}>
+                  <Pressable style={styles.recentTextWrap} onPress={() => router.push(`/search?q=${encodeURIComponent(r)}`)}>
                     <Text style={styles.recentText} numberOfLines={1}>{r}</Text>
                   </Pressable>
                   <Pressable onPress={() => removeRecent(r)} style={styles.recentRemove}>
@@ -318,15 +314,8 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={styles.floatingDock} pointerEvents="box-none">
-          <View style={styles.dockPill}>
-            <Text style={styles.dockPin}>📌</Text>
-            <Text style={styles.dockText}>Hôm nay</Text>
-            <View style={styles.dockDivider} />
-            <Text style={styles.dockCalendar}>🗓</Text>
-          </View>
-
-          <Pressable style={styles.fab} onPress={() => router.push('/modal')}>
-            <Text style={styles.fabText}>+</Text>
+          <Pressable style={styles.fab} onPress={() => router.push('/modal')} hitSlop={8}>
+            <MaterialIcons name="add" size={30} color="#fff" />
           </Pressable>
         </View>
 
@@ -462,6 +451,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#111",
     paddingVertical: 0,
+  },
+  searchPlaceholderText: {
+    flex: 1,
+    fontSize: 18,
+    color: "#8d8d8d",
   },
   bannerCard: {
     height: 228,
@@ -852,23 +846,17 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    right: 18,
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: "#fff",
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#2ecc71",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#211f1a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  fabText: {
-    fontSize: 52,
-    lineHeight: 52,
-    color: "#111",
-    marginTop: -4,
+    shadowColor: "#2ecc71",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
 });

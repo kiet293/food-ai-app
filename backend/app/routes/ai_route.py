@@ -9,11 +9,12 @@ from app.models.database import get_db
 from app.crud.recipe_stats import record_recipe_scan
 
 # Import Schemas và Services
-from app.schemas.recipe import AIAnalysisResult, RecipeChatRequest
+from app.schemas.recipe import AIAnalysisResult, RecipeChatRequest, RecipeSearchRequest, RecipeSearchResponse, Ingredient
 from app.ai.yolo_service import (
     analyze_food_image, 
     ask_gemini_for_recipe, 
-    ask_gemini_for_new_recipe
+    ask_gemini_for_new_recipe,
+    ask_gemini_for_multiple_recipes
 )
 
 # Khởi tạo Router thay vì dùng app
@@ -133,3 +134,40 @@ async def chat_for_new_recipe(request: RecipeChatRequest, db: Session = Depends(
         instructions=instructions,
         imageUrl=image_url
     )
+
+
+@router.post("/search", response_model=RecipeSearchResponse)
+async def search_recipes_by_ingredients(request: RecipeSearchRequest, db: Session = Depends(get_db)):
+    print(f"🔎 Nhận yêu cầu tìm kiếm từ nguyên liệu: {request.ingredients}")
+    
+    # 1. Hỏi Gemini danh sách các món ăn gợi ý
+    raw_recipes = ask_gemini_for_multiple_recipes(request.ingredients)
+    
+    # 2. Xử lý và làm đẹp kết quả (lấy ảnh từ Pexels, chuẩn hóa nguyên liệu)
+    formatted_recipes = []
+    for r in raw_recipes:
+        recipe_name = r.get("recipeName", "Món ăn từ AI")
+        ingredients = r.get("ingredients", [])
+        instructions = r.get("instructions", [])
+        
+        # Lấy ảnh đẹp từ Pexels
+        image_url = await fetch_food_image_url(recipe_name)
+        
+        # Định dạng nguyên liệu phù hợp với Schema AIAnalysisResult
+        formatted_ingredients = [Ingredient(name=name, probability=100) for name in ingredients]
+        
+        # Ghi nhận lượt gợi ý vào CSDL thống kê
+        # (Để các món được gợi ý có thể lọt vào bảng xếp hạng Top món ăn xu hướng)
+        record_recipe_scan(db, recipe_name, formatted_ingredients, instructions, image_url)
+        
+        formatted_recipes.append(
+            AIAnalysisResult(
+                ingredients=formatted_ingredients,
+                recipeName=recipe_name,
+                instructions=instructions,
+                imageUrl=image_url
+            )
+        )
+        
+    print(f"📤 Trả về {len(formatted_recipes)} món ăn gợi ý thành công!")
+    return RecipeSearchResponse(recipes=formatted_recipes)

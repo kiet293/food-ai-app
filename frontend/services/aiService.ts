@@ -250,3 +250,27 @@ export const getPopularRecipes = async (): Promise<PopularRecipe[]> => {
     return [];
   }
 };
+
+// TÌM KIẾM MÓN ĂN TỪ NGUYÊN LIỆU (Dạng Text)
+export const searchRecipes = async (ingredients: string[]): Promise<{ recipes: AIAnalysisResult[] }> => {
+  try {
+    console.log("🔎 Đang gửi danh sách nguyên liệu để tìm kiếm món ăn...");
+    const response = await fetch(`${API_AI}/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ingredients }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Server AI search đang lỗi');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("❌ Lỗi tìm kiếm công thức:", error);
+    return { recipes: [] };
+  }
+};
