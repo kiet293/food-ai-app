@@ -24,10 +24,10 @@ except Exception as e:
     print(f"❌ Lỗi: Không tìm thấy file bestCT.pt. Vui lòng kiểm tra lại! Lỗi: {e}")
     model = None
 
-def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
-    """Gửi nguyên liệu cho Gemini và lấy công thức nấu ăn"""
+def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, str, list[str]]:
+    """Gửi nguyên liệu cho Gemini và lấy công thức nấu ăn, kèm theo tên tiếng Anh để vẽ ảnh"""
     if not ingredients_list:
-        return "Không tìm thấy nguyên liệu", ["Vui lòng chụp ảnh rõ hơn."]
+        return "Không tìm thấy nguyên liệu", "", ["Vui lòng chụp ảnh rõ hơn."]
 
     # Kỹ thuật Prompt Engineering: Ép Gemini trả về JSON chuẩn
     prompt = f"""
@@ -36,13 +36,15 @@ def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
     
     Nhiệm vụ của bạn:
     1. Gợi ý 1 món ăn Việt Nam ngon nhất, thực tế và dễ nấu nhất từ các nguyên liệu trên.
-    2. Bạn được phép giả định trong bếp đã có sẵn các gia vị cơ bản (mắm, muối, tiêu, đường, dầu ăn, hành tỏi, v.v.).
-    3. Nếu các nguyên liệu đưa vào hoàn toàn KHÔNG hợp nhau (ví dụ: Thịt bò và Dưa hấu), hãy thông minh chọn ra nhóm nguyên liệu tốt nhất trong số đó để nấu, bỏ qua món không hợp.
-    4. Viết hướng dẫn nấu ăn thật sinh động, chi tiết, dễ hiểu cho người mới bắt đầu.
+    2. Dịch/Mô tả tên món ăn này sang tiếng Anh một cách chi tiết và chính xác (ví dụ: "Thịt kho tàu" -> "Vietnamese caramelized pork belly with eggs", "Phở bò" -> "Vietnamese beef noodle soup") để làm prompt vẽ ảnh cho AI.
+    3. Bạn được phép giả định trong bếp đã có sẵn các gia vị cơ bản (mắm, muối, tiêu, đường, dầu ăn, hành tỏi, v.v.).
+    4. Nếu các nguyên liệu đưa vào hoàn toàn KHÔNG hợp nhau (ví dụ: Thịt bò và Dưa hấu), hãy thông minh chọn ra nhóm nguyên liệu tốt nhất trong số đó để nấu, bỏ qua món không hợp.
+    5. Viết hướng dẫn nấu ăn thật sinh động, chi tiết, dễ hiểu cho người mới bắt đầu.
     
     Yêu cầu ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Chỉ trả về chuỗi JSON chuẩn, không giải thích gì thêm):
     {{
-        "recipeName": "Tên món ăn hấp dẫn (Ví dụ: Bò lúc lắc, Canh cà chua trứng...)",
+        "recipeName": "Tên món ăn hấp dẫn bằng tiếng Việt (Ví dụ: Bò lúc lắc, Canh cà chua trứng...)",
+        "englishName": "Tên hoặc mô tả ngắn món ăn bằng tiếng Anh (Ví dụ: Stir-fried diced beef, Tomato egg drop soup...)",
         "instructions": [
             "Bước 1: Sơ chế - (Chi tiết cách làm...)",
             "Bước 2: Chế biến - (Chi tiết cách làm...)",
@@ -60,11 +62,15 @@ def ask_gemini_for_recipe(ingredients_list: list) -> tuple[str, list[str]]:
         # Vì đã có JSON mode, response.text chắc chắn là một JSON string hợp lệ
         data = json.loads(response.text)
         
-        return data.get("recipeName", "Món ăn ngon từ AI"), data.get("instructions", [])
+        return (
+            data.get("recipeName", "Món ăn ngon từ AI"),
+            data.get("englishName", "Delicious Vietnamese food"),
+            data.get("instructions", [])
+        )
         
     except Exception as e:
         print(f"❌ Lỗi gọi Gemini: {e}")
-        return "Lỗi gợi ý món ăn", ["Không thể kết nối với bộ não Gemini lúc này."]
+        return "Lỗi gợi ý món ăn", "", ["Không thể kết nối với bộ não Gemini lúc này."]
 
 def analyze_food_image(image_bytes: bytes) -> list[Ingredient]:
     """Hàm này nhận ảnh, cho YOLO xem và trả về danh sách nguyên liệu"""
@@ -90,7 +96,7 @@ def analyze_food_image(image_bytes: bytes) -> list[Ingredient]:
 
     return final_ingredients
 
-def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, user_message: str) -> tuple[str, list[str]]:
+def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, user_message: str) -> tuple[str, str, list[str]]:
     """Gửi yêu cầu đổi món ăn của người dùng cho Gemini"""
     
     prompt = f"""
@@ -100,10 +106,11 @@ def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, 
     Hãy gợi ý NGAY một món ăn mới cực kỳ phù hợp với yêu cầu trên.
     Trả về kết quả duy nhất dưới dạng JSON nguyên khối (không kèm chữ giải thích bên ngoài) theo cấu trúc:
     {{
-        "recipeName": "Tên món ăn mới",
+        "recipeName": "Tên món ăn mới bằng tiếng Việt",
+        "englishName": "Tên hoặc mô tả ngắn món ăn mới bằng tiếng Anh (ví dụ: Vietnamese caramel pork)",
         "instructions": ["Bước 1...", "Bước 2...", "Bước 3..."]
     }}
-    Lưu ý: Chỉ trả về JSON, ngôn ngữ bằng tiếng Việt.
+    Lưu ý: Chỉ trả về JSON, các trường recipeName và instructions bằng tiếng Việt, englishName bằng tiếng Anh.
     """
 
     try:
@@ -116,10 +123,14 @@ def ask_gemini_for_new_recipe(ingredients_list: list[str], current_recipe: str, 
         # Vì đã có JSON mode, response.text chắc chắn là một JSON string hợp lệ
         data = json.loads(response.text)
         
-        return data.get("recipeName", "Món ăn từ AI"), data.get("instructions", [])
+        return (
+            data.get("recipeName", "Món ăn từ AI"),
+            data.get("englishName", "Delicious Vietnamese food"),
+            data.get("instructions", [])
+        )
     except Exception as e:
         print(f"❌ Lỗi gọi Gemini Chat: {e}")
-        return "Lỗi gợi ý món ăn", ["Không thể kết nối với bộ não Gemini lúc này."]
+        return "Lỗi gợi ý món ăn", "", ["Không thể kết nối với bộ não Gemini lúc này."]
 
 
 def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
@@ -142,6 +153,7 @@ def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
         "recipes": [
             {{
                 "recipeName": "Tên món ăn 1 (Ví dụ: Canh cà chua trứng)",
+                "englishName": "Tên hoặc mô tả ngắn món ăn 1 bằng tiếng Anh (Ví dụ: Tomato egg drop soup)",
                 "ingredients": ["cà chua", "trứng", "hành lá"],
                 "instructions": [
                     "Bước 1: Sơ chế...",
@@ -151,6 +163,7 @@ def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
             }},
             {{
                 "recipeName": "Tên món ăn 2 (Ví dụ: Trứng đúc thịt)",
+                "englishName": "Tên hoặc mô tả ngắn món ăn 2 bằng tiếng Anh (Ví dụ: Steamed egg with minced pork)",
                 "ingredients": ["trứng", "thịt heo băm", "hành khô"],
                 "instructions": [
                     "Bước 1: Sơ chế...",
@@ -160,6 +173,7 @@ def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
             }},
             {{
                 "recipeName": "Tên món ăn 3...",
+                "englishName": "Tên hoặc mô tả ngắn món ăn 3 bằng tiếng Anh",
                 "ingredients": [],
                 "instructions": []
             }}
@@ -178,3 +192,35 @@ def ask_gemini_for_multiple_recipes(ingredients_list: list[str]) -> list[dict]:
     except Exception as e:
         print(f"❌ Lỗi gọi Gemini gợi ý nhiều món: {e}")
         return []
+
+# gent images
+def generate_food_image_url(english_name: str) -> str:
+    """Tìm kiếm ảnh thực tế trên Pexels dựa trên tên tiếng Anh của món ăn"""
+    import urllib.parse
+    import httpx
+    
+    clean_name = english_name.strip() if english_name else "Vietnamese food"
+    pexels_key = os.getenv("PEXELS_API_KEY")
+    
+    if not pexels_key:
+        print("⚠️ Cảnh báo: Chưa cấu hình PEXELS_API_KEY trong .env. Sử dụng ảnh mặc định.")
+        return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800"
+        
+    try:
+        encoded_query = urllib.parse.quote(clean_name)
+        url = f"https://api.pexels.com/v1/search?query={encoded_query}&per_page=1"
+        headers = {"Authorization": pexels_key}
+        
+        # Gọi API Pexels để tìm kiếm ảnh
+        response = httpx.get(url, headers=headers, timeout=5.0)
+        if response.status_code == 200:
+            data = response.json()
+            photos = data.get("photos", [])
+            if photos:
+                # Trả về URL ảnh chất lượng lớn
+                return photos[0].get("src", {}).get("large", "")
+        print(f"⚠️ Pexels không tìm thấy ảnh cho: '{clean_name}'. Sử dụng ảnh mặc định.")
+    except Exception as e:
+        print(f"❌ Lỗi khi tìm kiếm ảnh trên Pexels: {e}")
+        
+    return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, SafeAreaView, Image
 } from 'react-native';
@@ -15,6 +15,16 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
   // State quản lý việc nhắn tin
   const [customMessage, setCustomMessage] = useState("");
   const [isChatting, setIsChatting] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+
+  // Reset trạng thái load ảnh khi đổi món ăn mới
+  useEffect(() => {
+    setImageError(false);
+    if (resultData?.imageUrl) {
+      setIsImageLoading(true);
+    }
+  }, [resultData?.imageUrl]);
 
   const handleSaveRecipe = async () => {
     if (!resultData) return;
@@ -83,11 +93,26 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({ isLoading, resul
 
           {/* Hiển thị ảnh món ăn vừa tìm được */}
           {resultData.imageUrl && (
-            <Image
-              source={{ uri: resultData.imageUrl }}
-              style={styles.recipeImage}
-              resizeMode="cover"
-            />
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: imageError ? 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800' : resultData.imageUrl }}
+                style={styles.recipeImage}
+                resizeMode="cover"
+                onLoadStart={() => setIsImageLoading(true)}
+                onLoadEnd={() => setIsImageLoading(false)}
+                onError={() => {
+                  console.log("❌ Lỗi load ảnh từ Pollinations AI, chuyển sang ảnh fallback...");
+                  setImageError(true);
+                  setIsImageLoading(false);
+                }}
+              />
+              {isImageLoading && (
+                <View style={styles.imageLoader}>
+                  <ActivityIndicator size="small" color="#28a745" />
+                  <Text style={styles.loaderText}>Đang vẽ ảnh bằng AI...</Text>
+                </View>
+              )}
+            </View>
           )}
 
           <View style={styles.divider} />
@@ -267,7 +292,30 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,          // Chiều cao bức ảnh cố định 200px nhìn rất sang
     borderRadius: 10,     // Bo nhẹ góc ảnh cho đồng bộ với cái card
-    marginVertical: 12,   // Cách trên cách dưới một khoảng vừa vặn
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 200,
+    marginVertical: 12,
     backgroundColor: '#e1e4e6', // Màu nền xám nhạt hiện lên lúc ảnh đang load mạng chậm
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(240, 244, 248, 0.8)',
+  },
+  loaderText: {
+    marginTop: 5,
+    fontSize: 12,
+    color: '#555',
+    fontStyle: 'italic',
   },
 });
