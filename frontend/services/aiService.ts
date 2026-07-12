@@ -36,7 +36,7 @@ const getBaseUrl = () => {
   return 'http://localhost:5000/api';
 };
 
-// ⚠️ THAY ĐỊA CHỈ IP DƯỚI ĐÂY BẰNG IPv4 CỦA MÁY TÍNH BẠN
+// THAY ĐỊA CHỈ IP DƯỚI ĐÂY BẰNG IPv4 CỦA MÁY TÍNH BẠN
 // Cách 1: Set cứng ip của máy vào 
 // const BASE_URL = 'http://192.168.1.23:5000/api';
 
