@@ -10,8 +10,9 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -19,15 +20,11 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { getUserProfile } from "../../services/authService";
 
-type KeywordCard = {
-  title: string;
-  image: ImageSourcePropType;
-};
-
 type FeedCard = {
   title: string;
   author: string;
   image: ImageSourcePropType;
+  tag?: string;
 };
 
 type IngredientCard = {
@@ -101,23 +98,36 @@ const newestRecipes: FeedCard[] = [
     title: "Phá Lấu Lòng Heo Kiểu Triều Châu",
     author: "Bòn Bon",
     image: { uri: "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80" },
+    tag: "Món chính 🍛",
   },
   {
     title: "Bánh ướt vỉa hè",
     author: "Huyen le Tran",
     image: { uri: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=80" },
+    tag: "Ăn sáng 🥞",
   },
   {
     title: "Kem chuối giấy siêu dễ siêu ngon",
     author: "minh!",
     image: { uri: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=600&q=80" },
+    tag: "Tráng miệng 🍨",
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const [userAvatar, setUserAvatar] = useState<string>("👨‍🍳");
+  const [userInfo, setUserInfo] = useState<{ full_name: string } | null>(null);
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientCard | null>(null);
+  const { items: recentItems, remove: removeRecent } = useRecentSearches();
+
+  // Xác định câu chào động theo giờ
+  const getGreeting = () => {
+    const hr = new Date().getHours();
+    if (hr < 12) return "Chào buổi sáng ☀️";
+    if (hr < 18) return "Chào buổi chiều 🌤️";
+    return "Chào buổi tối 🌙";
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -126,6 +136,7 @@ export default function HomeScreen() {
       const loadProfile = async () => {
         const profile = await getUserProfile();
         if (profile && isActive) {
+          setUserInfo(profile);
           setUserAvatar(profile.avatar || "👨‍🍳");
         }
       };
@@ -149,29 +160,67 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Header Row */}
           <View style={styles.headerRow}>
-            <View style={styles.avatar}>
+            <Pressable
+              style={styles.avatar}
+              onPress={() => router.push('/(tabs)/profile')}
+              hitSlop={8}
+            >
               {isAvatarUrl ? (
                 <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarText}>{userAvatar}</Text>
               )}
+            </Pressable>
+
+            <View style={styles.welcomeTextWrap}>
+              <Text style={styles.welcomeSub}>{getGreeting()}</Text>
+              <Text style={styles.welcomeTitle} numberOfLines={1}>
+                {userInfo?.full_name || "Đầu Bếp Tại Gia"}
+              </Text>
             </View>
-            <Text style={styles.pageTitle}>Tìm Kiếm</Text>
+
             <View style={styles.notificationWrap}>
               <Text style={styles.notificationIcon}>🔔</Text>
               <View style={styles.notificationDot} />
             </View>
           </View>
 
-          <View style={styles.searchBox}>
-            <MaterialIcons name="search" size={30} color="#626262" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Gõ vào tên các nguyên liệu..."
-              placeholderTextColor="#8d8d8d"
-              style={styles.searchInput}
-            />
-          </View>
+
+          {/* Search Box Pressable */}
+          <Pressable
+            style={styles.searchBox}
+            onPress={() => router.push('/search')}
+          >
+            <MaterialIcons name="search" size={28} color="#626262" style={styles.searchIcon} />
+            <Text style={styles.searchPlaceholderText}>Gõ vào tên các nguyên liệu...</Text>
+          </Pressable>
+
+          {/* Recent Searches Scroll (Horizontal Chips) */}
+          {recentItems.length > 0 && (
+            <View style={styles.recentSection}>
+              <Text style={styles.recentTitle}>Tìm kiếm gần đây</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentChipsContainer}>
+                {recentItems.map((r) => (
+                  <View key={r} style={styles.recentChip}>
+                    <TouchableOpacity
+                      onPress={() => router.push(`/search?q=${encodeURIComponent(r)}`)}
+                      style={styles.chipTextButton}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.recentChipText} numberOfLines={1}>{r}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeRecent(r)} style={styles.chipCloseButton} hitSlop={6}>
+                      <MaterialIcons name="close" size={14} color="#8aab8a" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Banner Card */}
 
           <View style={styles.bannerCard}>
             <Image
@@ -188,9 +237,9 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* Section: Popular Ingredients */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Nguyên Liệu Phổ Biến</Text>
-      
           </View>
 
           <View style={styles.keywordGrid}>
@@ -198,6 +247,12 @@ export default function HomeScreen() {
               <Pressable key={item.name} style={styles.keywordCard} onPress={() => setSelectedIngredient(item)}>
                 <Image source={item.image} style={styles.keywordImage} />
                 <View style={styles.keywordScrim} />
+
+                {/* Badge đếm số món gợi ý nấu */}
+                <View style={styles.recipeCountBadge}>
+                  <Text style={styles.recipeCountText}>{item.dishes.length} món</Text>
+                </View>
+
                 <Text style={styles.keywordLabel} numberOfLines={1}>
                   {item.name}
                 </Text>
@@ -205,9 +260,10 @@ export default function HomeScreen() {
             ))}
           </View>
 
+          {/* Section: Premium */}
           <View style={styles.premiumHeader}>
             <Text style={styles.premiumIcon}>🏅</Text>
-            <Text style={styles.premiumTitle}>Premium</Text>
+            <Text style={styles.premiumTitle}>Premium Đặc Quyền</Text>
           </View>
 
           <View style={styles.premiumList}>
@@ -218,25 +274,33 @@ export default function HomeScreen() {
                   <Text style={styles.premiumRowTitle}>{item.title}</Text>
                   <Text style={styles.premiumRowSubtitle}>{item.author}</Text>
                 </View>
+                <MaterialIcons name="chevron-right" size={24} color="#adc6ad" />
               </Pressable>
             ))}
           </View>
 
+          {/* Section: Newest Recipes */}
           <View style={styles.sectionHeaderLarge}>
-            <Text style={styles.sectionTitle}>Mới lên sóng gần đây</Text>
-            <Text style={styles.arrow}>→</Text>
+            <Text style={styles.sectionTitle}>Mới lên sóng gần đây ✨</Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.newestRow}>
             {newestRecipes.map((item) => (
               <Pressable key={item.title} style={styles.newestCard}>
-                <Image source={item.image} style={styles.newestImage} />
+                <View style={styles.newestImageWrap}>
+                  <Image source={item.image} style={styles.newestImage} />
+                  {item.tag && (
+                    <View style={styles.newestTagBadge}>
+                      <Text style={styles.newestTagText}>{item.tag}</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={styles.newestTextBox}>
                   <Text style={styles.newestTitle} numberOfLines={2}>
                     {item.title}
                   </Text>
                   <Text style={styles.newestAuthor} numberOfLines={1}>
-                    {item.author}
+                    🍳 Bởi {item.author}
                   </Text>
                 </View>
               </Pressable>
@@ -244,19 +308,14 @@ export default function HomeScreen() {
           </ScrollView>
         </ScrollView>
 
+        {/* Floating FAB to open camera screen */}
         <View style={styles.floatingDock} pointerEvents="box-none">
-          <View style={styles.dockPill}>
-            <Text style={styles.dockPin}>📌</Text>
-            <Text style={styles.dockText}>Hôm nay</Text>
-            <View style={styles.dockDivider} />
-            <Text style={styles.dockCalendar}>🗓</Text>
-          </View>
-
-          <Pressable style={styles.fab} onPress={() => router.push('/modal')}>
-            <Text style={styles.fabText}>+</Text>
+          <Pressable style={styles.fab} onPress={() => router.push('/modal')} hitSlop={8}>
+            <MaterialIcons name="add" size={30} color="#fff" />
           </Pressable>
         </View>
 
+        {/* Selected Ingredient Modal (Bottom Sheet style) */}
         <Modal
           animationType="slide"
           transparent={true}
@@ -264,36 +323,56 @@ export default function HomeScreen() {
           onRequestClose={() => setSelectedIngredient(null)}
         >
           <View style={styles.ingredientModalOverlay}>
+            <Pressable style={styles.modalBackdrop} onPress={() => setSelectedIngredient(null)} />
             <View style={styles.ingredientModalCard}>
               {selectedIngredient && (
                 <>
+                  <View style={styles.handleBar} />
+
                   <View style={styles.ingredientModalHeader}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.ingredientModalTitle}>{selectedIngredient.name}</Text>
-                      <Text style={styles.ingredientModalSubtitle}>Thành phần, lợi ích và món ăn gợi ý</Text>
+                      <Text style={styles.ingredientModalSubtitle}>Thành phần dinh dưỡng & Lợi ích</Text>
                     </View>
-                    <Pressable onPress={() => setSelectedIngredient(null)} style={styles.closeIngredientButton}>
-                      <Text style={styles.closeIngredientButtonText}>✕</Text>
+                    <Pressable onPress={() => setSelectedIngredient(null)} style={styles.closeIngredientButton} hitSlop={8}>
+                      <MaterialIcons name="close" size={20} color="#1a3a1a" />
                     </Pressable>
                   </View>
 
-                  <Image source={selectedIngredient.image} style={styles.ingredientHeroImage} />
-
                   <ScrollView style={styles.ingredientModalBody} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.ingredientSectionTitle}>Thành phần dinh dưỡng</Text>
-                    {selectedIngredient.composition.map((item) => (
-                      <Text key={item} style={styles.ingredientBulletText}>• {item}</Text>
-                    ))}
+                    <Image source={selectedIngredient.image} style={styles.ingredientHeroImage} resizeMode="cover" />
 
-                    <Text style={styles.ingredientSectionTitle}>Lợi ích khi ăn</Text>
-                    {selectedIngredient.benefits.map((item) => (
-                      <Text key={item} style={styles.ingredientBulletText}>• {item}</Text>
-                    ))}
+                    <View style={styles.modalSectionBox}>
+                      <Text style={styles.modalSectionTitle}>🛒 Thành phần chủ yếu</Text>
+                      {selectedIngredient.composition.map((item) => (
+                        <View key={item} style={styles.bulletRow}>
+                          <View style={styles.bulletDot} />
+                          <Text style={styles.bulletText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
 
-                    <Text style={styles.ingredientSectionTitle}>Món ăn có thể nấu</Text>
-                    {selectedIngredient.dishes.map((item) => (
-                      <Text key={item} style={styles.ingredientBulletText}>• {item}</Text>
-                    ))}
+                    <View style={styles.modalSectionBox}>
+                      <Text style={styles.modalSectionTitle}>❤️ Lợi ích cho sức khỏe</Text>
+                      {selectedIngredient.benefits.map((item) => (
+                        <View key={item} style={styles.bulletRow}>
+                          <View style={styles.bulletDot} />
+                          <Text style={styles.bulletText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={styles.modalSectionBox}>
+                      <Text style={styles.modalSectionTitle}>🍳 Món ngon đề xuất</Text>
+                      {selectedIngredient.dishes.map((item) => (
+                        <View key={item} style={styles.bulletRow}>
+                          <View style={[styles.bulletDot, { backgroundColor: '#e67e22' }]} />
+                          <Text style={styles.bulletText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={{ height: 30 }} />
                   </ScrollView>
                 </>
               )}
@@ -309,31 +388,36 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#f6f3ea",
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   root: {
     flex: 1,
-    backgroundColor: "#f6f3ea",
+    backgroundColor: "#f0f4f0",
   },
   scrollContainer: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 180,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 120,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 22,
+    marginBottom: 20,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#0d5e4f",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#2ecc71",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   avatarImage: {
     width: "100%",
@@ -341,61 +425,121 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
   },
-  pageTitle: {
+  welcomeTextWrap: {
     flex: 1,
-    marginLeft: 16,
-    fontSize: 30,
+    marginLeft: 12,
+  },
+  welcomeSub: {
+    fontSize: 12,
+    color: "#8aab8a",
+    fontWeight: "600",
+  },
+  welcomeTitle: {
+    fontSize: 18,
     fontWeight: "800",
-    color: "#111",
+    color: "#1a3a1a",
+    marginTop: 2,
   },
   notificationWrap: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#1a3a1a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   notificationIcon: {
-    fontSize: 28,
+    fontSize: 20,
   },
   notificationDot: {
     position: "absolute",
-    top: 4,
-    right: 2,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: "#ff4b37",
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#ff4757",
   },
   searchBox: {
-    minHeight: 58,
-    borderRadius: 32,
+    height: 54,
+    borderRadius: 27,
     borderWidth: 1,
-    borderColor: "#d4d0c7",
+    borderColor: "#dde8dd",
     backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
-    marginBottom: 22,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: "#1a3a1a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchIcon: {
-    marginRight: 12,
-    marginTop: -2,
+    marginRight: 10,
   },
-  searchInput: {
+  searchPlaceholderText: {
     flex: 1,
-    fontSize: 18,
-    color: "#111",
-    paddingVertical: 0,
+    fontSize: 15,
+    color: "#adc6ad",
+    fontWeight: "500",
+  },
+  recentSection: {
+    marginBottom: 16,
+  },
+  recentTitle: {
+    fontSize: 13,
+    color: "#8aab8a",
+    fontWeight: "700",
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  recentChipsContainer: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  recentChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#dde8dd",
+    paddingLeft: 12,
+    paddingRight: 6,
+    height: 32,
+  },
+  chipTextButton: {
+    marginRight: 4,
+  },
+  recentChipText: {
+    fontSize: 13,
+    color: "#1a3a1a",
+    fontWeight: "600",
+  },
+  chipCloseButton: {
+    padding: 2,
   },
   bannerCard: {
-    height: 228,
-    borderRadius: 18,
+    height: 200,
+    borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 24,
+    marginBottom: 20,
     backgroundColor: "#d8c6a5",
+    shadowColor: "#1a3a1a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   bannerImage: {
     width: "100%",
@@ -403,7 +547,7 @@ const styles = StyleSheet.create({
   },
   bannerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.18)",
+    backgroundColor: "rgba(26, 58, 26, 0.2)",
   },
   bannerContent: {
     position: "absolute",
@@ -413,71 +557,66 @@ const styles = StyleSheet.create({
   },
   bannerDatePill: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(241, 241, 225, 0.95)",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginBottom: 10,
-  },
-  bannerDateText: {
-    color: "#58734d",
-    fontWeight: "800",
-    fontSize: 14,
-  },
-  bannerTitle: {
-    color: "#fff5a8",
-    fontSize: 32,
-    lineHeight: 35,
-    fontWeight: "900",
-    textShadowColor: "rgba(0,0,0,0.55)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     marginBottom: 8,
   },
-  bannerHashtag: {
-    color: "#fefbe8",
-    fontSize: 24,
-    fontWeight: "800",
-    textShadowColor: "rgba(0,0,0,0.45)",
+  bannerDateText: {
+    color: "#2ecc71",
+    fontWeight: "700",
+    fontSize: 11,
+  },
+  bannerTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
+    textShadowColor: "rgba(0,0,0,0.4)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+    marginBottom: 4,
+  },
+  bannerHashtag: {
+    color: "#f0f4f0",
+    fontSize: 14,
+    fontWeight: "700",
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 14,
+    alignItems: "center",
+    marginBottom: 12,
   },
   sectionHeaderLarge: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 16,
-    marginBottom: 14,
+    marginTop: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 26,
-    lineHeight: 30,
-    fontWeight: "900",
-    color: "#111",
-  },
-  sectionMeta: {
-    fontSize: 14,
-    color: "#8b857b",
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1a3a1a",
   },
   keywordGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    gap: 10,
   },
   keywordCard: {
     width: "48%",
-    height: 132,
+    height: 120,
     borderRadius: 14,
     overflow: "hidden",
-    marginBottom: 12,
-    backgroundColor: "#ddd",
+    backgroundColor: "#fff",
+    shadowColor: "#1a3a1a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   keywordImage: {
     width: "100%",
@@ -485,7 +624,21 @@ const styles = StyleSheet.create({
   },
   keywordScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.18)",
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+  },
+  recipeCountBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(26, 58, 26, 0.7)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  recipeCountText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
   },
   keywordLabel: {
     position: "absolute",
@@ -493,223 +646,236 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 10,
     color: "#fff",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "800",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  ingredientModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
-  },
-  ingredientModalCard: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "88%",
-    paddingBottom: 18,
-  },
-  ingredientModalHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 12,
-  },
-  ingredientModalTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: "#111",
-  },
-  ingredientModalSubtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: "#6d655c",
-  },
-  closeIngredientButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f3f4f6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeIngredientButtonText: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#111",
-  },
-  ingredientHeroImage: {
-    width: "100%",
-    height: 180,
-  },
-  ingredientModalBody: {
-    paddingHorizontal: 18,
-    paddingTop: 16,
-  },
-  ingredientSectionTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  ingredientBulletText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#333",
-    marginBottom: 8,
   },
   premiumHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 12,
   },
   premiumIcon: {
-    fontSize: 30,
-    marginRight: 10,
+    fontSize: 24,
+    marginRight: 6,
   },
   premiumTitle: {
-    fontSize: 26,
-    lineHeight: 30,
-    fontWeight: "900",
-    color: "#111",
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1a3a1a",
   },
   premiumList: {
-    backgroundColor: "transparent",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    shadowColor: "#1a3a1a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#e8f0e8",
   },
   premiumRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#ddd7ca",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f4f0",
   },
   premiumThumb: {
-    width: 92,
-    height: 74,
+    width: 64,
+    height: 54,
     borderRadius: 8,
-    backgroundColor: "#e7e1d8",
+    backgroundColor: "#f0f4f0",
   },
   premiumTextWrap: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
   },
   premiumRowTitle: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 6,
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a3a1a",
+    marginBottom: 4,
   },
   premiumRowSubtitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    color: "#2f2f2f",
-  },
-  arrow: {
-    fontSize: 34,
-    color: "#6c645a",
-    marginBottom: -2,
+    fontSize: 12,
+    color: "#8aab8a",
   },
   newestRow: {
     paddingBottom: 8,
+    paddingHorizontal: 2,
+    gap: 12,
   },
   newestCard: {
-    width: 180,
+    width: 170,
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#fff",
-    marginRight: 12,
-    shadowColor: "#1d1b19",
+    shadowColor: "#1a3a1a",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "#e8f0e8",
+  },
+  newestImageWrap: {
+    position: "relative",
   },
   newestImage: {
     width: "100%",
-    height: 150,
+    height: 120,
+  },
+  newestTagBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "#2ecc71",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  newestTagText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
   },
   newestTextBox: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 12,
   },
   newestTitle: {
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 8,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    color: "#1a3a1a",
+    marginBottom: 6,
   },
   newestAuthor: {
-    fontSize: 16,
-    color: "#7a6f61",
+    fontSize: 12,
+    color: "#8aab8a",
+    fontWeight: "500",
   },
   floatingDock: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 38,
+    bottom: 30,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-  },
-  dockPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 34,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    shadowColor: "#211f1a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.13,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  dockPin: {
-    fontSize: 22,
-    marginRight: 10,
-    color: "#c6c6c6",
-  },
-  dockText: {
-    fontSize: 18,
-    color: "#c3c3c3",
-    fontWeight: "700",
-  },
-  dockDivider: {
-    width: 1,
-    height: 34,
-    backgroundColor: "#d0c7bb",
-    marginHorizontal: 14,
-  },
-  dockCalendar: {
-    fontSize: 22,
   },
   fab: {
     position: "absolute",
-    right: 18,
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: "#fff",
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#2ecc71",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#211f1a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowColor: "#2ecc71",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  fabText: {
-    fontSize: 52,
-    lineHeight: 52,
-    color: "#111",
-    marginTop: -4,
+  // Modal Bottom Sheet Styles
+  ingredientModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  ingredientModalCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "82%",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#dde8dd",
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  ingredientModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e8f0e8",
+  },
+  ingredientModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1a3a1a",
+  },
+  ingredientModalSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#8aab8a",
+  },
+  closeIngredientButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f0f4f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ingredientHeroImage: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  ingredientModalBody: {
+    flex: 1,
+  },
+  modalSectionBox: {
+    backgroundColor: "#f7fbf7",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e8f0e8",
+  },
+  modalSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1a3a1a",
+    marginBottom: 8,
+  },
+  bulletRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  bulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#2ecc71",
+    marginRight: 10,
+  },
+  bulletText: {
+    fontSize: 14,
+    color: "#2d4a2d",
+    flex: 1,
   },
 });

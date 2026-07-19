@@ -1,13 +1,41 @@
+# Python / Backend
 venv/
 backend/venv/
 __pycache__/
-*.pyc
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# Ignore environment variables files
+# Environment variables
 .env
-.venv
-.venv/*
 .env.*
+.venv
+.venv/
+backend/.env
 
+# Uploads / Data
+backend/uploads/
+uploads/
+*.sqlite3
+backend/*.db
+
+# Node.js / Frontend
+node_modules/
+frontend/node_modules/
+dist/
+build/
+.expo/
+.next/
+npm-debug.log
+yarn-error.log
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# AI Models / Weights
 *.pt
 backend/app/ai/best.pt

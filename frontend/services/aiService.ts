@@ -36,7 +36,7 @@ const getBaseUrl = () => {
   return 'http://localhost:5000/api';
 };
 
-// ⚠️ THAY ĐỊA CHỈ IP DƯỚI ĐÂY BẰNG IPv4 CỦA MÁY TÍNH BẠN
+// THAY ĐỊA CHỈ IP DƯỚI ĐÂY BẰNG IPv4 CỦA MÁY TÍNH BẠN
 // Cách 1: Set cứng ip của máy vào 
 // const BASE_URL = 'http://192.168.1.23:5000/api';
 
@@ -248,5 +248,29 @@ export const getPopularRecipes = async (): Promise<PopularRecipe[]> => {
   } catch (error) {
     console.error("❌ Lỗi khi tải danh sách phổ biến:", error);
     return [];
+  }
+};
+
+// TÌM KIẾM MÓN ĂN TỪ NGUYÊN LIỆU (Dạng Text)
+export const searchRecipes = async (ingredients: string[]): Promise<{ recipes: AIAnalysisResult[] }> => {
+  try {
+    console.log("🔎 Đang gửi danh sách nguyên liệu để tìm kiếm món ăn...");
+    const response = await fetch(`${API_AI}/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ingredients }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Server AI search đang lỗi');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("❌ Lỗi tìm kiếm công thức:", error);
+    return { recipes: [] };
   }
 };
