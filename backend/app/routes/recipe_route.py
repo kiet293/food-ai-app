@@ -18,7 +18,42 @@ from app.utils.response import success_response, CustomException
 # Khai báo tags chung cho toàn bộ API trong file này
 router = APIRouter(tags=["Recipes - Sổ tay & Xu hướng"])
 
-# HÀM HỖ TRỢ: ĐỊNH DẠNG DỮ LIỆU CÔNG THỨC RÚT GỌN
+# ====================================================================================================
+# HÀM HỖ TRỢ (HELPER FUNCTIONS)
+# ====================================================================================================
+
+def upload_image_to_cloudinary(image: UploadFile) -> str:
+    """Tải ảnh lên Cloudinary và trả về secure_url."""
+    try:
+        upload_result = cloudinary.uploader.upload(image.file)
+        image_url = upload_result.get("secure_url")
+        print(f"📸 Đã lưu ảnh lên Cloudinary thành công: {image_url}")
+        return image_url
+    except Exception as e:
+        print(f"❌ Lỗi khi upload ảnh lên Cloudinary: {e}")
+        raise CustomException(
+            message=f"Không thể upload ảnh: {str(e)}",
+            code="IMAGE_UPLOAD_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+def delete_image_from_cloudinary(image_url: str):
+    """Xóa ảnh cũ trên Cloudinary dựa vào URL."""
+    if not image_url or "cloudinary.com" not in image_url:
+        return
+    try:
+        parts = image_url.split('/upload/')
+        if len(parts) > 1:
+            path_part = parts[1]
+            if path_part.startswith('v'):
+                path_part = path_part.split('/', 1)[1] if '/' in path_part else path_part
+            public_id = path_part.rsplit('.', 1)[0]
+            print(f"🗑️ Đang xóa ảnh cũ trên Cloudinary: {public_id}")
+            cloudinary.uploader.destroy(public_id)
+    except Exception as e:
+        print(f"❌ Lỗi khi xóa ảnh cũ trên Cloudinary: {e}")
+        # Không throw lỗi để tiến trình cập nhật vẫn tiếp tục dù xóa ảnh cũ thất bại
+
 def format_recipe_summary(recipe: RecipeDB):
     author_info = None
     if recipe.author:
@@ -190,20 +225,7 @@ def create_recipe(
             )
 
         # Xử lý upload ảnh với Cloudinary
-        image_url = None
-        if image:
-            try:
-                # Cloudinary uploader nhận file-like object
-                upload_result = cloudinary.uploader.upload(image.file)
-                image_url = upload_result.get("secure_url")
-                print(f"📸 Đã lưu ảnh lên Cloudinary thành công: {image_url}")
-            except Exception as e:
-                print(f"❌ Lỗi khi upload ảnh lên Cloudinary: {e}")
-                raise CustomException(
-                    message=f"Không thể upload ảnh: {str(e)}",
-                    code="IMAGE_UPLOAD_ERROR",
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        image_url = upload_image_to_cloudinary(image) if image else None
 
         # Tạo mới record
         try:
@@ -385,5 +407,111 @@ def get_recipes(
         raise CustomException(
             message="Lỗi hệ thống khi tải danh sách công thức",
             code="GET_RECIPES_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API CHỈNH SỬA CÔNG THỨC NẤU ĂN
+@router.put("/{recipe_id}")
+def update_recipe(
+    recipe_id: int,
+    recipe_name: str = Form(None),
+    description: str = Form(None),
+    ingredients: str = Form(None), 
+    instructions: str = Form(None), 
+    cook_time_minutes: int = Form(None),
+    servings: int = Form(None),
+    difficulty: str = Form(None),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Tìm công thức trong DB
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+            
+        # Kiểm tra quyền tác giả
+        if recipe.user_id != current_user.id:
+            raise CustomException(
+                message="Bạn không có quyền chỉnh sửa công thức này",
+                code="FORBIDDEN",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+            
+        # Parse JSON nếu có
+        if ingredients:
+            try:
+                parsed_ingredients = json.loads(ingredients)
+                recipe.ingredients = parsed_ingredients
+            except json.JSONDecodeError as e:
+                print(f"❌ Lỗi khi parse JSON ingredients: {e}")
+                raise CustomException(
+                    message="Dữ liệu ingredients không đúng định dạng JSON",
+                    code="INVALID_JSON_FORMAT",
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+                
+        if instructions:
+            try:
+                parsed_instructions = json.loads(instructions)
+                recipe.instructions = parsed_instructions
+            except json.JSONDecodeError as e:
+                print(f"❌ Lỗi khi parse JSON instructions: {e}")
+                raise CustomException(
+                    message="Dữ liệu instructions không đúng định dạng JSON",
+                    code="INVALID_JSON_FORMAT",
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Xử lý cập nhật ảnh với Cloudinary
+        if image:
+            # 1. Xóa ảnh cũ
+            delete_image_from_cloudinary(recipe.image_url)
+            # 2. Upload ảnh mới
+            recipe.image_url = upload_image_to_cloudinary(image)
+
+        # Cập nhật các trường dữ liệu text
+        if recipe_name is not None:
+            recipe.recipe_name = recipe_name
+        if description is not None:
+            recipe.description = description
+        if cook_time_minutes is not None:
+            recipe.cook_time_minutes = cook_time_minutes
+        if servings is not None:
+            recipe.servings = servings
+        if difficulty is not None:
+            recipe.difficulty = difficulty
+
+        # Lưu thay đổi
+        db.commit()
+        db.refresh(recipe)
+        
+        print(f"✅ Đã cập nhật công thức: {recipe.recipe_name}")
+        
+        # Trả về data (tái sử dụng format_recipe_summary)
+        recipe_data = format_recipe_summary(recipe)
+        recipe_data["description"] = recipe.description
+        recipe_data["ingredients"] = recipe.ingredients
+        recipe_data["instructions"] = recipe.instructions
+        recipe_data["servings"] = recipe.servings
+        
+        return success_response(data=recipe_data, message="Cập nhật công thức thành công!")
+        
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Lỗi hệ thống khi cập nhật công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi cập nhật công thức",
+            code="UPDATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
