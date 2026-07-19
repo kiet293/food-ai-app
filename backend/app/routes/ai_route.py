@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Depends
 from typing import List
 import httpx
 from sqlalchemy.orm import Session
+from urllib.parse import quote_plus
 
 # Import cấu hình và DB
 from app.models.database import get_db
@@ -20,29 +21,6 @@ from app.ai.yolo_service import (
 # Khởi tạo Router thay vì dùng app
 router = APIRouter(prefix="/ai", tags=["AI Analysis"])
 
-<<<<<<< HEAD
-PEXELS_API_KEY = "UPgnazTcU7NR8u5c0lnB2VLGgjRnzivrw5ok58JoKcmYtAtl4MXmzLbW"
-DEFAULT_IMAGE = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500"
-
-async def fetch_food_image_url(query_name: str) -> str:
-    """Hàm tự động mang tên món ăn lên Pexels để tìm 1 tấm ảnh đẹp nhất"""
-    url = f"https://api.pexels.com/v1/search?query={query_name}&per_page=1"
-    headers = {"Authorization": PEXELS_API_KEY}
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers, timeout=5.0)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("photos") and len(data["photos"]) > 0:
-                    return data["photos"][0]["src"]["medium"]
-    except Exception as e:
-        print(f"⚠️ Không thể lấy ảnh từ Pexels do lỗi: {e}")
-    
-    return DEFAULT_IMAGE
-
-=======
->>>>>>> main
 # API này khi ghép vào main sẽ thành /api/analyze
 @router.post("/analyze", response_model=AIAnalysisResult)
 async def analyze_image(image_files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
