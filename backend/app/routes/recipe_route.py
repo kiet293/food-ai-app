@@ -220,3 +220,79 @@ def create_recipe(
             code="CREATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
+@router.get("/{recipe_id}")
+def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
+    try:
+        # Tìm công thức trong DB
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Định dạng thông tin tác giả
+        author_info = None
+        if recipe.author:
+            author_info = {
+                "id": recipe.author.id,
+                "name": recipe.author.full_name or recipe.author.username,
+                "avatar": recipe.author.avatar
+            }
+            
+        # Tính toán điểm đánh giá
+        ratings_list = [{"id": r.id, "score": r.score, "user_id": r.user_id} for r in recipe.ratings] if recipe.ratings else []
+        ratings_avg = sum(r["score"] for r in ratings_list) / len(ratings_list) if len(ratings_list) > 0 else 0
+        
+        # Format danh sách bình luận
+        comments_list = []
+        if recipe.comments:
+            for c in recipe.comments:
+                user_info = None
+                if c.user:
+                    user_info = {
+                        "id": c.user.id,
+                        "name": c.user.full_name or c.user.username,
+                        "avatar": c.user.avatar
+                    }
+                comments_list.append({
+                    "id": c.id,
+                    "content": c.content,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "user": user_info
+                })
+        
+        # Trả về format chuẩn API
+        data = {
+            "id": recipe.id,
+            "title": recipe.recipe_name,
+            "description": recipe.description,
+            "image": recipe.image_url,
+            "ingredients": recipe.ingredients,
+            "instructions": recipe.instructions,
+            "cook_time_minutes": recipe.cook_time_minutes,
+            "servings": recipe.servings,
+            "difficulty": recipe.difficulty,
+            "author": author_info,
+            "ratings_avg": round(ratings_avg, 1),
+            "ratings_count": len(ratings_list),
+            "comments": comments_list
+        }
+        
+        return success_response(data=data, message="Lấy thông tin chi tiết công thức thành công")
+        
+    except CustomException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Lỗi khi lấy chi tiết công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi tải chi tiết công thức",
+            code="GET_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

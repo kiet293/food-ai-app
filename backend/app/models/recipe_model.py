@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey  # type: ignore
+from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
+from sqlalchemy.orm import relationship # type: ignore
 from app.models.database import Base
 
 class RecipeDB(Base):
@@ -10,6 +11,11 @@ class RecipeDB(Base):
 
     # Giả lập User ID
     user_id = Column(Integer, ForeignKey("users.id"))
+
+    # Các quan hệ (Relationships)
+    author = relationship("UserDB", backref="recipes")
+    comments = relationship("CommentDB", backref="recipe", cascade="all, delete-orphan")
+    ratings = relationship("RatingDB", backref="recipe", cascade="all, delete-orphan")
 
     # Tên món ăn
     recipe_name = Column(String, index=True)
@@ -54,4 +60,31 @@ class RecipeStatsDB(Base):
     image_url = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class CommentDB(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    content = Column(Text, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Lấy thông tin user đăng bình luận
+    user = relationship("UserDB")
+
+
+class RatingDB(Base):
+    __tablename__ = "ratings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    score = Column(Integer, nullable=False) # VD: từ 1 đến 5 sao
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("UserDB")
