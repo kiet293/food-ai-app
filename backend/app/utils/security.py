@@ -1,10 +1,14 @@
+import os
 import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
-# Chìa khóa bí mật để ký Token 
-SECRET_KEY = "khoa-bi-mat-sieu-cap-cua-do-an-ai-food"
-ALGORITHM = "HS256"
+load_dotenv()
+
+# Đọc từ file .env để bảo mật
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # Token sống được 7 ngày
 
 def get_password_hash(password: str) -> str:

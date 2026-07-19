@@ -134,7 +134,7 @@ export default function ModalScreen() {
           )}
 
           <AnalysisResult
-          
+            isLoading={isLoading}
             resultData={resultData}
             onUpdateResult={setResultData}
           />

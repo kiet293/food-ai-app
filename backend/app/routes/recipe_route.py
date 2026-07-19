@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+import json
+import os
+import shutil
+import uuid
+import cloudinary
+import cloudinary.uploader
 from sqlalchemy.orm import Session
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, RecipeStatsDB
@@ -6,6 +12,7 @@ from app.schemas.recipe import AIAnalysisResult # Tái sử dụng schema cũ đ
 from app.models.user_model import UserDB
 from app.utils.deps import get_current_user
 from app.crud.recipe_stats import record_recipe_save
+from app.utils.response import success_response, CustomException
 
 # Khai báo tags chung cho toàn bộ API trong file này
 router = APIRouter(tags=["Recipes - Sổ tay & Xu hướng"])
@@ -25,7 +32,7 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Công thức này đã tồn tại trong Sổ tay của bạn!"
-            )
+        )
     
     # Nếu chưa có, tiến hành lưu
     try:
@@ -63,7 +70,7 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="Không thể lưu vào CSDL"
-            )
+        )
 
 # api lấy danh sách công thức nấu ăn từ database
 @router.get("/list")
@@ -80,7 +87,7 @@ def get_all_recipes(db: Session = Depends(get_db), current_user: UserDB = Depend
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="Không thể tải danh sách công thức"
-            )
+        )
 
 # api xóa công thức nấu ăn khỏi database
 @router.delete("/{recipe_id}")
@@ -126,6 +133,90 @@ def get_popular_recipes(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="Không thể tải danh sách món ăn xu hướng"
+        )
+
+# API ĐĂNG TẢI CÔNG THỨC MỚI (US-06)
+@router.post("/")
+def create_recipe(
+    recipe_name: str = Form(...),
+    description: str = Form(None),
+    ingredients: str = Form(...), # Sẽ nhận mảng dạng chuỗi JSON
+    instructions: str = Form(...), # Sẽ nhận mảng dạng chuỗi JSON
+    cook_time_minutes: int = Form(None),
+    servings: int = Form(None),
+    difficulty: str = Form(None),
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Parse JSON từ form data
+        try:
+            parsed_ingredients = json.loads(ingredients)
+            parsed_instructions = json.loads(instructions)
+        except json.JSONDecodeError as e:
+            print(f"❌ Lỗi khi parse JSON: {e}")
+            raise CustomException(
+                message="Dữ liệu ingredients hoặc instructions không đúng định dạng JSON",
+                code="INVALID_JSON_FORMAT",
+                status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        # Xử lý upload ảnh với Cloudinary
+        image_url = None
+        if image:
+            try:
+                # Cloudinary uploader nhận file-like object
+                upload_result = cloudinary.uploader.upload(image.file)
+                image_url = upload_result.get("secure_url")
+                print(f"📸 Đã lưu ảnh lên Cloudinary thành công: {image_url}")
+            except Exception as e:
+                print(f"❌ Lỗi khi upload ảnh lên Cloudinary: {e}")
+                raise CustomException(
+                    message=f"Không thể upload ảnh: {str(e)}",
+                    code="IMAGE_UPLOAD_ERROR",
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
+        # Tạo mới record
+        try:
+            new_recipe = RecipeDB(
+                user_id=current_user.id,
+                recipe_name=recipe_name,
+                description=description,
+                ingredients=parsed_ingredients,
+                instructions=parsed_instructions,
+                cook_time_minutes=cook_time_minutes,
+                servings=servings,
+                difficulty=difficulty,
+                image_url=image_url
+            )
+
+            db.add(new_recipe)
+            db.commit()
+            db.refresh(new_recipe)
+            
+            print(f"✅ Đã tạo công thức mới: {new_recipe.recipe_name}")
+            return success_response(data={"recipe_id": new_recipe.id}, message="Đăng tải công thức thành công!")
+        except Exception as e:
+            db.rollback()
+            import traceback
+            traceback.print_exc()
+            print(f"❌ Lỗi DATABASE khi insert công thức: {e}")
+            raise CustomException(
+                message=f"Lỗi Database: {str(e)}",
+                code="DB_INSERT_ERROR",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    except CustomException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Lỗi hệ thống: {e}")
+        raise CustomException(
+            message="Không thể tạo công thức mới",
+            code="CREATE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

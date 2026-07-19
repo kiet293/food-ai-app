@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey  # type: ignore
+from sqlalchemy.sql import func  # type: ignore
 from app.models.database import Base
 
 class RecipeDB(Base):
@@ -23,8 +23,15 @@ class RecipeDB(Base):
     # Cột lưu hình ảnh
     image_url = Column(String, nullable=True)
     
-    # Tự động lưu thời gian tạo
+    # Bổ sung các cột mới theo US-06
+    description = Column(String, nullable=True)
+    cook_time_minutes = Column(Integer, nullable=True)
+    servings = Column(Integer, nullable=True)
+    difficulty = Column(String, nullable=True)
+
+    # Tự động lưu thời gian tạo và cập nhật
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class RecipeStatsDB(Base):

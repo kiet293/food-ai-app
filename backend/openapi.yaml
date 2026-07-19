@@ -1,0 +1,829 @@
+openapi: 3.0.3
+info:
+  title: Food AI App API
+  description: API documentation for the Recipe Sharing & AI Ingredient Detection Platform.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+tags:
+  - name: Authentication
+    description: User login, registration, and token management
+  - name: Users
+    description: User profile and management
+  - name: Recipes
+    description: Recipe CRUD and categories
+  - name: AI & Search
+    description: AI ingredient detection and recipe search
+  - name: Community
+    description: Comments, ratings, favorites, and follows
+  - name: Collections
+    description: Personal recipe collections
+  - name: Notifications
+    description: User notifications and settings
+
+paths:
+  # ---------------------------------------------------------
+  # Authentication
+  # ---------------------------------------------------------
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Bad request (e.g., username/email already exists)
+  
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login for access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username_or_email:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username_or_email
+                - password
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Unauthorized
+  
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout (invalidate token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully logged out
+
+  # ---------------------------------------------------------
+  # Users
+  # ---------------------------------------------------------
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+    put:
+      tags:
+        - Users
+      summary: Update current user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  # ---------------------------------------------------------
+  # Recipes
+  # ---------------------------------------------------------
+  /recipes:
+    get:
+      tags:
+        - Recipes
+      summary: List recipes
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: q
+          in: query
+          description: Search by recipe name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of recipes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RecipeResponse'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  size:
+                    type: integer
+    post:
+      tags:
+        - Recipes
+      summary: Create a new recipe
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeCreate'
+      responses:
+        '201':
+          description: Recipe created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeResponse'
+
+  /recipes/{id}:
+    get:
+      tags:
+        - Recipes
+      summary: Get recipe details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recipe details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeResponse'
+        '404':
+          description: Recipe not found
+    put:
+      tags:
+        - Recipes
+      summary: Update a recipe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeUpdate'
+      responses:
+        '200':
+          description: Recipe updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeResponse'
+    delete:
+      tags:
+        - Recipes
+      summary: Delete a recipe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Recipe deleted
+
+  /categories:
+    get:
+      tags:
+        - Recipes
+      summary: List categories
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryResponse'
+
+  # ---------------------------------------------------------
+  # AI & Search
+  # ---------------------------------------------------------
+  /ai/detect-ingredients:
+    post:
+      tags:
+        - AI & Search
+      summary: Upload an image to detect ingredients
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Ingredients detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIDetectionResponse'
+                
+  /ai/histories:
+    get:
+      tags:
+        - AI & Search
+      summary: Get current user's AI detection histories
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of histories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIDetectionResponse'
+
+  /search/ingredients:
+    get:
+      tags:
+        - AI & Search
+      summary: Search recipes by ingredients
+      parameters:
+        - name: ingredients
+          in: query
+          description: Comma separated list of ingredient names
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of matching recipes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeResponse'
+
+  # ---------------------------------------------------------
+  # Community (Comments, Ratings, Favorites, Follows)
+  # ---------------------------------------------------------
+  /recipes/{id}/comments:
+    get:
+      tags:
+        - Community
+      summary: List comments for a recipe
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommentResponse'
+    post:
+      tags:
+        - Community
+      summary: Add a comment to a recipe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+
+  /recipes/{id}/rate:
+    post:
+      tags:
+        - Community
+      summary: Rate a recipe (1-5)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+      responses:
+        '200':
+          description: Rating submitted
+
+  /recipes/{id}/favorite:
+    post:
+      tags:
+        - Community
+      summary: Add recipe to favorites
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Added to favorites
+    delete:
+      tags:
+        - Community
+      summary: Remove recipe from favorites
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Removed from favorites
+
+  /users/{id}/follow:
+    post:
+      tags:
+        - Community
+      summary: Follow a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User followed
+    delete:
+      tags:
+        - Community
+      summary: Unfollow a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: User unfollowed
+
+  # ---------------------------------------------------------
+  # Collections
+  # ---------------------------------------------------------
+  /collections:
+    get:
+      tags:
+        - Collections
+      summary: Get user's collections
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of collections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CollectionResponse'
+    post:
+      tags:
+        - Collections
+      summary: Create a collection
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionCreate'
+      responses:
+        '201':
+          description: Collection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionResponse'
+
+  /collections/{id}/recipes:
+    post:
+      tags:
+        - Collections
+      summary: Add recipe to collection
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipe_id:
+                  type: integer
+      responses:
+        '200':
+          description: Recipe added to collection
+
+  # ---------------------------------------------------------
+  # Notifications
+  # ---------------------------------------------------------
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Get user's notifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationResponse'
+
+# =========================================================
+# Components
+# =========================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # -- Auth / Users --
+    UserCreate:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        full_name:
+          type: string
+      required:
+        - username
+        - email
+        - password
+        
+    UserUpdate:
+      type: object
+      properties:
+        full_name:
+          type: string
+        bio:
+          type: string
+        avatar:
+          type: string
+        is_private:
+          type: boolean
+          
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        full_name:
+          type: string
+        avatar:
+          type: string
+        bio:
+          type: string
+        is_private:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+
+    # -- Recipes --
+    RecipeCreate:
+      type: object
+      properties:
+        recipe_name:
+          type: string
+        description:
+          type: string
+        ingredients:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              quantity:
+                type: string
+        instructions:
+          type: array
+          items:
+            type: string
+        cook_time_minutes:
+          type: integer
+        servings:
+          type: integer
+        difficulty:
+          type: string
+          enum: [EASY, MEDIUM, HARD]
+        image_url:
+          type: string
+        category_ids:
+          type: array
+          items:
+            type: integer
+      required:
+        - recipe_name
+        - ingredients
+        - instructions
+
+    RecipeUpdate:
+      type: object
+      properties:
+        recipe_name:
+          type: string
+        description:
+          type: string
+        ingredients:
+          type: array
+          items:
+            type: object
+        instructions:
+          type: array
+          items:
+            type: string
+        cook_time_minutes:
+          type: integer
+        servings:
+          type: integer
+        difficulty:
+          type: string
+        image_url:
+          type: string
+
+    RecipeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        recipe_name:
+          type: string
+        description:
+          type: string
+        ingredients:
+          type: array
+          items:
+            type: object
+        instructions:
+          type: array
+          items:
+            type: string
+        cook_time_minutes:
+          type: integer
+        servings:
+          type: integer
+        difficulty:
+          type: string
+        image_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        author:
+          $ref: '#/components/schemas/UserResponse'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryResponse'
+
+    CategoryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+
+    # -- AI --
+    AIDetectionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        image_url:
+          type: string
+        detected_ingredients:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # -- Community --
+    CommentCreate:
+      type: object
+      properties:
+        content:
+          type: string
+        parent_comment_id:
+          type: integer
+          nullable: true
+      required:
+        - content
+
+    CommentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+        recipe_id:
+          type: integer
+        user_id:
+          type: integer
+        parent_comment_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    # -- Collections --
+    CollectionCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        is_public:
+          type: boolean
+      required:
+        - name
+
+    CollectionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # -- Notifications --
+    NotificationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        reference_type:
+          type: string
+        reference_id:
+          type: integer
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/UserResponse'

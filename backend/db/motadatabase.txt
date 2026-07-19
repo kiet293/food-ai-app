@@ -1,0 +1,272 @@
+@startuml Recipe_App_ERD
+
+' =====================================================================
+' RECIPE SHARING & AI INGREDIENT DETECTION PLATFORM - ERD (PlantUML)
+' Grouped by module. 3 bang co san (users, recipes, recipe_stats) duoc
+' danh dau [CO SAN] - chi bo sung thuoc tinh, khong doi cau truc.
+' =====================================================================
+
+hide circle
+skinparam linetype ortho
+skinparam roundcorner 8
+skinparam shadowing false
+skinparam class {
+  BackgroundColor<<core>> #FDE9D9
+  BackgroundColor<<auth>> #DCE6F1
+  BackgroundColor<<recipe>> #FDE9D9
+  BackgroundColor<<search>> #CFE2F3
+  BackgroundColor<<ai>> #E2EFDA
+  BackgroundColor<<community>> #FCE4D6
+  BackgroundColor<<notify>> #FFE599
+  BackgroundColor<<collection>> #A2C4C9
+  BackgroundColor<<report>> #EA9999
+  BorderColor #305496
+  ArrowColor #5B7DB1
+  FontName Arial
+}
+
+' ---------------------------------------------------------------------
+package "Module: Authentication & User Management" {
+  entity "users [CO SAN]" as users <<auth>> {
+    * id : integer <<PK>>
+    --
+    username : varchar
+    hashed_password : varchar
+    full_name : varchar
+    avatar : varchar
+    created_at : timestamptz
+    ..bo sung..
+    + email : varchar <<UNIQUE>>
+    + bio : text
+    + is_private : boolean
+    + role : varchar
+    + status : varchar
+    + updated_at : timestamptz
+  }
+
+  entity "user_tokens" as user_tokens <<auth>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK>>
+    token : varchar <<UNIQUE>>
+    type : varchar
+    expires_at : timestamptz
+    created_at : timestamptz
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: Recipe Management" {
+  entity "recipes [CO SAN]" as recipes <<recipe>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK>>
+    recipe_name : varchar
+    ingredients : json
+    instructions : json
+    created_at : timestamptz
+    image_url : varchar
+    ..bo sung..
+    + description : text
+    + cook_time_minutes : integer
+    + servings : integer
+    + difficulty : varchar
+    + updated_at : timestamptz
+  }
+
+  entity "categories" as categories <<recipe>> {
+    * id : integer <<PK>>
+    --
+    name : varchar <<UNIQUE>>
+    slug : varchar <<UNIQUE>>
+    created_at : timestamptz
+  }
+
+  entity "recipe_categories" as recipe_categories <<recipe>> {
+    * id : integer <<PK>>
+    --
+    # recipe_id : integer <<FK>>
+    # category_id : integer <<FK>>
+    created_at : timestamptz
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: Search / AI ho tro" {
+  entity "recipe_ingredient_index" as recipe_ingredient_index <<search>> {
+    * id : integer <<PK>>
+    --
+    # recipe_id : integer <<FK>>
+    ingredient_name : varchar
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: AI Ingredient Detection" {
+  entity "ai_detection_histories" as ai_detection_histories <<ai>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK>>
+    image_url : varchar
+    detected_ingredients : jsonb
+    created_at : timestamptz
+  }
+
+  entity "recipe_stats [CO SAN]" as recipe_stats <<ai>> {
+    * id : integer <<PK>>
+    --
+    recipe_name : varchar <<UNIQUE>>
+    scan_count : integer
+    save_count : integer
+    ingredients : json
+    instructions : json
+    image_url : varchar
+    created_at : timestamptz
+    updated_at : timestamptz
+    ..bo sung..
+    + recipe_id : integer <<FK, NULL>>
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: Community Interaction" {
+  entity "comments" as comments <<community>> {
+    * id : integer <<PK>>
+    --
+    # recipe_id : integer <<FK>>
+    # user_id : integer <<FK>>
+    # parent_comment_id : integer <<FK, NULL>>
+    content : text
+    created_at : timestamptz
+    updated_at : timestamptz
+  }
+
+  entity "comment_likes" as comment_likes <<community>> {
+    * id : integer <<PK>>
+    --
+    # comment_id : integer <<FK>>
+    # user_id : integer <<FK>>
+    created_at : timestamptz
+  }
+
+  entity "ratings" as ratings <<community>> {
+    * id : integer <<PK>>
+    --
+    # recipe_id : integer <<FK>>
+    # user_id : integer <<FK>>
+    score : smallint
+    created_at : timestamptz
+    updated_at : timestamptz
+  }
+
+  entity "favorites" as favorites <<community>> {
+    * id : integer <<PK>>
+    --
+    # recipe_id : integer <<FK>>
+    # user_id : integer <<FK>>
+    created_at : timestamptz
+  }
+
+  entity "follows" as follows <<community>> {
+    * id : integer <<PK>>
+    --
+    # follower_id : integer <<FK>>
+    # following_id : integer <<FK>>
+    created_at : timestamptz
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: Notifications" {
+  entity "notifications" as notifications <<notify>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK>>
+    # actor_id : integer <<FK, NULL>>
+    type : varchar
+    reference_type : varchar
+    reference_id : integer
+    is_read : boolean
+    created_at : timestamptz
+  }
+
+  entity "notification_settings" as notification_settings <<notify>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK, UNIQUE>>
+    follow_enabled : boolean
+    like_enabled : boolean
+    comment_enabled : boolean
+    rating_enabled : boolean
+    new_recipe_enabled : boolean
+    updated_at : timestamptz
+  }
+}
+
+' ---------------------------------------------------------------------
+package "Module: Collections" {
+  entity "collections" as collections <<collection>> {
+    * id : integer <<PK>>
+    --
+    # user_id : integer <<FK>>
+    name : varchar
+    is_public : boolean
+    created_at : timestamptz
+    updated_at : timestamptz
+  }
+
+  entity "collection_recipes" as collection_recipes <<collection>> {
+    * id : integer <<PK>>
+    --
+    # collection_id : integer <<FK>>
+    # recipe_id : integer <<FK>>
+    created_at : timestamptz
+  }
+}
+
+' ---------------------------------------------------------------------
+
+
+' =====================================================================
+' RELATIONSHIPS
+' =====================================================================
+
+' -- Authentication --
+users ||--o{ user_tokens : "user_id"
+
+' -- Recipe Management --
+users ||--o{ recipes : "user_id"
+recipes ||--o{ recipe_categories : "recipe_id"
+categories ||--o{ recipe_categories : "category_id"
+
+' -- Search support --
+recipes ||--o{ recipe_ingredient_index : "recipe_id"
+
+' -- AI Ingredient Detection --
+users ||--o{ ai_detection_histories : "user_id"
+recipes |o--o{ recipe_stats : "recipe_id (nullable)"
+
+' -- Community Interaction --
+recipes ||--o{ comments : "recipe_id"
+users ||--o{ comments : "user_id"
+comments ||--o{ comments : "parent_comment_id"
+comments ||--o{ comment_likes : "comment_id"
+users ||--o{ comment_likes : "user_id"
+recipes ||--o{ ratings : "recipe_id"
+users ||--o{ ratings : "user_id"
+recipes ||--o{ favorites : "recipe_id"
+users ||--o{ favorites : "user_id"
+users ||--o{ follows : "follower_id"
+users ||--o{ follows : "following_id"
+
+' -- Notifications --
+users ||--o{ notifications : "user_id"
+users ||--|| notification_settings : "user_id"
+
+' -- Collections --
+users ||--o{ collections : "user_id"
+collections ||--o{ collection_recipes : "collection_id"
+recipes ||--o{ collection_recipes : "recipe_id"
+
+
+@enduml

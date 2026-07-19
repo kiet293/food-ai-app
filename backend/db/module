@@ -1,0 +1,127 @@
+NỀN TẢNG CHIA SẺ CÔNG THỨC NẤU ĂN VÀ TƯƠNG TÁC CỘNG ĐỒNG TÍCH HỢP AI
+1. GIỚI THIỆU DỰ ÁN
+1.1 Mục tiêu
+Xây dựng nền tảng cho phép người dùng chia sẻ, khám phá công thức nấu ăn và tương tác cộng đồng, tích hợp AI nhận dạng nguyên liệu từ hình ảnh để gợi ý món ăn phù hợp.
+Hệ thống giúp:
+•	Tiết kiệm thời gian tìm kiếm công thức nấu ăn.
+•	Tận dụng nguyên liệu sẵn có, tránh lãng phí thực phẩm.
+•	Kết nối cộng đồng yêu thích nấu ăn.
+•	Gợi ý món ăn thông minh dựa trên nguyên liệu nhận dạng.
+Tham khảo: Pepper (https://pepper.vn), Cookpad
+________________________________________
+1.2 Các đối tượng sử dụng
+Đối tượng	Mô tả	Chức năng chính
+Guest	Người chưa đăng nhập	Đăng ký, đăng nhập, xem công thức
+User	Người dùng đã đăng nhập	Đăng tải công thức, tương tác cộng đồng, AI detect nguyên liệu
+Admin	Quản trị viên hệ thống	Quản lý người dùng, quản lý nội dung, dashboard hệ thống
+System	Tác vụ chạy nền	Xử lý AI inference, gợi ý món ăn, thống kê
+________________________________________
+2. CÁC MODULE CHÍNH CỦA HỆ THỐNG
+________________________________________
+MODULE 1: QUẢN LÝ NGƯỜI DÙNG VÀ XÁC THỰC
+Mục đích:
+Cho phép người dùng truy cập và sử dụng hệ thống một cách an toàn.
+Các chức năng:
+•	Đăng ký tài khoản (email, username, password)
+•	Đăng nhập (JWT Authentication)
+•	Đăng xuất
+•	Quên mật khẩu (reset qua email)
+•	Đổi mật khẩu
+•	Quản lý thông tin cá nhân
+•	Cập nhật avatar
+Bảng dữ liệu: users, user_tokens
+________________________________________
+MODULE 2: QUẢN LÝ CÔNG THỨC NẤU ĂN
+Mục đích:
+Cho phép người dùng đăng tải, quản lý và chia sẻ công thức nấu ăn.
+Các chức năng:
+•	Tạo công thức mới (title, description, ingredients, steps, cooking time, servings)
+•	Chỉnh sửa công thức
+•	Xóa công thức
+•	Xem chi tiết công thức
+•	Danh sách công thức (phân trang, lọc theo danh mục)
+•	Tìm kiếm công thức (theo tên, nguyên liệu, tác giả)
+•	Công thức nổi bật (nhiều tương tác)
+•	Công thức mới nhất
+Bảng dữ liệu: recipes, recipe_ingredients, steps
+________________________________________
+MODULE 3: NHẬN DẠNG NGUYÊN LIỆU BẰNG AI
+Mục đích:
+Tích hợp mô hình AI để nhận dạng nguyên liệu từ hình ảnh và gợi ý món ăn.
+Các chức năng:
+•	Tải ảnh nguyên liệu lên
+•	Chụp ảnh nguyên liệu trực tiếp (mobile)
+•	Nhận dạng nguyên liệu bằng AI (YOLO)
+•	Hiển thị danh sách nguyên liệu đã nhận dạng
+•	Gợi ý món ăn từ nguyên liệu đã nhận dạng
+•	Lưu lịch sử nhận dạng
+Bảng dữ liệu: ai_detection_histories
+________________________________________
+MODULE 4: TƯƠNG TÁC CỘNG ĐỒNG
+Mục đích:
+Xây dựng môi trường tương tác, kết nối giữa những người yêu thích nấu ăn.
+Các chức năng:
+4.1. Bình luận (Comment)
+•	Bình luận trên công thức
+•	Chỉnh sửa bình luận
+•	Xóa bình luận
+•	Xem danh sách bình luận
+4.2. Đánh giá (Rating)
+•	Đánh giá công thức (1-5 sao)
+•	Xem điểm đánh giá trung bình
+•	Cập nhật đánh giá
+4.3. Yêu thích (Favorite)
+•	Lưu công thức yêu thích
+•	Bỏ lưu yêu thích
+•	Xem danh sách công thức đã lưu
+4.4. Theo dõi (Follow)
+•	Theo dõi người dùng khác
+•	Bỏ theo dõi
+•	Xem danh sách người theo dõi
+•	Xem danh sách đang theo dõi
+Bảng dữ liệu: comments, ratings, favorites, follows
+________________________________________
+MODULE 5: GỢI Ý MÓN ĂN
+Mục đích:
+Gợi ý thông minh các món ăn phù hợp với nguyên liệu hoặc sở thích người dùng.
+Các chức năng:
+•	Gợi ý món ăn từ nguyên liệu đã nhận dạng
+•	Gợi ý món ăn phổ biến
+•	Gợi ý món ăn mới nhất
+•	Gợi ý cá nhân hóa (dựa trên lịch sử tương tác)
+Bảng dữ liệu: Sử dụng recipes, recipe_ingredients, ai_detection_histories
+________________________________________
+MODULE 6: TÌM KIẾM
+Mục đích:
+Cho phép người dùng tìm kiếm công thức và người dùng một cách nhanh chóng.
+Các chức năng:
+•	Tìm kiếm công thức theo từ khóa
+•	Tìm kiếm công thức theo nguyên liệu
+•	Tìm kiếm người dùng
+•	Gợi ý từ khóa tìm kiếm
+Bảng dữ liệu: recipes, users
+________________________________________
+MODULE 7: DASHBOARD THỐNG KÊ
+Mục đích:
+Hiển thị thông tin tổng quan về công thức và tương tác cho người dùng.
+Các chức năng:
+•	Số công thức đã đăng
+•	Số lượt tương tác (like, comment, save)
+•	Số người theo dõi
+•	Công thức được xem nhiều nhất
+Bảng dữ liệu: recipes, ratings, comments, favorites, follows
+________________________________________
+MODULE 8: QUẢN TRỊ HỆ THỐNG (ADMIN)
+Mục đích:
+Quản lý toàn bộ hệ thống, nội dung và người dùng.
+Các chức năng:
+•	Quản lý người dùng (xem, khóa/mở khóa)
+•	Quản lý công thức (xem, xóa vi phạm)
+•	Quản lý bình luận (xem, xóa spam)
+•	Dashboard hệ thống
+o	Tổng số người dùng
+o	Tổng số công thức
+o	Tổng số tương tác
+o	Biểu đồ tăng trưởng
+Bảng dữ liệu: users, recipes, comments
+

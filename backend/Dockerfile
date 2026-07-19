@@ -1,10 +1,13 @@
-# 1. Dùng hệ điều hành Linux siêu nhẹ có sẵn Python 3.10
-FROM python:3.10-slim
+# 1. Dùng hệ điều hành Linux siêu nhẹ có sẵn Python 3.12
+FROM python:3.12-slim
 
 # 2. Tạo một thư mục tên là /app bên trong Docker để chứa code
 WORKDIR /app
 
-# 3. Copy file thư viện vào trước và cài đặt
+# 3. Cài đặt các thư viện hệ thống cần thiết cho OpenCV
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev
+
+# 4. Copy file thư viện vào trước và cài đặt
 COPY requirements.txt .
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 

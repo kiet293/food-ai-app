@@ -12,15 +12,12 @@ import {
   Text,
   TextInput,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { getUserProfile } from "../../services/authService";
-import useRecentSearches from "../../hooks/useRecentSearches";
-import { searchRecipes } from "../../services/aiService";
 
 type KeywordCard = {
   title: string;
@@ -121,10 +118,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const [userAvatar, setUserAvatar] = useState<string>("👨‍🍳");
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientCard | null>(null);
-  const [searchText, setSearchText] = useState<string>("");
-  const { items: recentItems, addSearch, remove: removeRecent } = useRecentSearches();
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,24 +137,6 @@ export default function HomeScreen() {
       };
     }, [])
   );
-
-  const handleSearch = async (override?: string) => {
-    const q = ((override ?? searchText) || "").trim();
-    if (!q) return;
-    try {
-      await addSearch(q);
-      // Chuẩn hóa: tách bởi dấu phẩy hoặc khoảng trắng
-      const ingredients = q.split(",").map((s) => s.trim()).filter(Boolean);
-      console.log("🔎 Tìm kiếm nguyên liệu:", ingredients);
-      setIsSearching(true);
-      const res = await searchRecipes(ingredients);
-      console.log("🔎 Kết quả tìm kiếm:", res);
-      setSearchResults(res?.recipes || []);
-      setIsSearching(false);
-    } catch (e) {
-      console.warn("Tìm kiếm lỗi:", e);
-    }
-  };
 
   const isAvatarUrl = userAvatar.startsWith("http://") || userAvatar.startsWith("https://");
 
@@ -190,60 +165,12 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.searchBox}>
-            <Pressable onPress={() => router.push('/search')} hitSlop={8}>
-              <MaterialIcons name="search" size={30} color="#626262" style={styles.searchIcon} />
-            </Pressable>
+            <MaterialIcons name="search" size={30} color="#626262" style={styles.searchIcon} />
             <TextInput
               placeholder="Gõ vào tên các nguyên liệu..."
               placeholderTextColor="#8d8d8d"
               style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              onFocus={() => router.push(`/search?q=${encodeURIComponent(searchText)}`)}
-              onSubmitEditing={() => router.push(`/search?q=${encodeURIComponent(searchText)}`)}
             />
-          </View>
-
-          {recentItems.length > 0 && (
-            <View style={styles.recentList}>
-              {recentItems.map((r) => (
-                <View key={r} style={styles.recentRow}>
-                  <Text style={styles.recentClock}>🕘</Text>
-                  <Pressable style={styles.recentTextWrap} onPress={() => { setSearchText(r); handleSearch(r); }}>
-                    <Text style={styles.recentText} numberOfLines={1}>{r}</Text>
-                  </Pressable>
-                  <Pressable onPress={() => removeRecent(r)} style={styles.recentRemove}>
-                    <Text style={styles.recentRemoveText}>✕</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* KHU VỰC HIỂN THỊ KẾT QUẢ TÌM KIẾM */}
-          <View style={styles.resultsArea}>
-            {isSearching ? (
-              <View style={styles.resultsLoading}>
-                <ActivityIndicator size="small" color="#333" />
-                <Text style={styles.resultsLoadingText}>Đang tìm kiếm...</Text>
-              </View>
-            ) : searchResults.length > 0 ? (
-              <View style={styles.resultsList}>
-                {searchResults.map((it, idx) => (
-                  <Pressable key={idx} style={styles.resultCard}>
-                    {it.imageUrl ? (
-                      <Image source={{ uri: it.imageUrl }} style={styles.resultThumb} />
-                    ) : (
-                      <View style={styles.resultThumbPlaceholder} />
-                    )}
-                    <View style={styles.resultTextWrap}>
-                      <Text style={styles.resultTitle} numberOfLines={2}>{it.title || it.recipeName || 'Gợi ý món'}</Text>
-                      <Text style={styles.resultSnippet} numberOfLines={2}>{(it.instructions && it.instructions[0]) || ''}</Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
           </View>
 
           <View style={styles.bannerCard}>
@@ -543,92 +470,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-  },
-  recentList: {
-    marginBottom: 12,
-  },
-  recentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#ece8de",
-  },
-  recentClock: {
-    fontSize: 18,
-    marginRight: 10,
-    color: "#6b665c",
-  },
-  recentTextWrap: {
-    flex: 1,
-  },
-  recentText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  recentRemove: {
-    marginLeft: 12,
-    padding: 6,
-  },
-  recentRemoveText: {
-    fontSize: 16,
-    color: "#777",
-  },
-  resultsArea: {
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  resultsLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  resultsLoadingText: {
-    marginLeft: 10,
-    color: '#444',
-  },
-  resultsList: {
-    marginTop: 6,
-  },
-  resultCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ece8de',
-  },
-  resultThumb: {
-    width: 72,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: '#e9e5dd',
-  },
-  resultThumbPlaceholder: {
-    width: 72,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: '#f1efe8',
-  },
-  resultTextWrap: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111',
-    marginBottom: 4,
-  },
-  resultSnippet: {
-    fontSize: 14,
-    color: '#6b655c',
   },
   keywordCard: {
     width: "48%",

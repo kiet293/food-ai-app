@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.models.recipe_model import RecipeStatsDB
 
