@@ -1,12 +1,17 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import {  Alert} from 'react-native';
 import { AIAnalysisResult, analyzeImagesWithAI } from '../services/aiService';
 
 export function useImageAnalysis() {
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [resultData, setResultData] = useState<AIAnalysisResult | null>(null);
+
+  const addImages = (newUris: string[]) => {
+    setImages((currentImages) => [...currentImages, ...newUris]);
+    setResultData(null);
+  };
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -16,8 +21,7 @@ export function useImageAnalysis() {
     });
 
     if (!result.canceled) {
-      setImages(result.assets.map(a => a.uri));
-      setResultData(null);
+      addImages(result.assets.map((asset) => asset.uri));
     }
   };
 
@@ -39,9 +43,18 @@ export function useImageAnalysis() {
     });
 
     if (!result.canceled) {
-      setImages([result.assets[0].uri]);
-      setResultData(null);
+      addImages([result.assets[0].uri]);
     }
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setImages((currentImages) => currentImages.filter((_, index) => index !== indexToRemove));
+    setResultData(null);
+  };
+
+  const clearImages = () => {
+    setImages([]);
+    setResultData(null);
   };
 
   const analyzeImage = async () => {
@@ -67,6 +80,8 @@ export function useImageAnalysis() {
     setResultData,
     pickImage,
     openCamera,
-    analyzeImage
+    analyzeImage,
+    removeImage,
+    clearImages
   };
 }
