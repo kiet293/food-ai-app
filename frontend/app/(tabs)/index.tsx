@@ -19,6 +19,8 @@ import { useCallback, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { getUserProfile } from "../../services/authService";
+import useRecentSearches from "../../hooks/useRecentSearches";
+import { searchRecipes } from "../../services/aiService";
 
 type FeedCard = {
   title: string;
@@ -187,7 +189,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-
           {/* Search Box Pressable */}
           <Pressable
             style={styles.searchBox}
@@ -221,7 +222,6 @@ export default function HomeScreen() {
           )}
 
           {/* Banner Card */}
-
           <View style={styles.bannerCard}>
             <Image
               source={{ uri: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80" }}
