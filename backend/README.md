@@ -40,3 +40,6 @@ uvicorn app.main:app --reload
 ```bash
 deactivate
 ```
+lệnh chạy server:
+# Quan trọng: Phải chạy với host 0.0.0.0 để cho phép kết nối từ bên ngoài
+uvicorn app.main:app --reload --host 0.0.0.0 --port 5000

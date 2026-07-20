@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:123456@localhost:5432/food_app_db" # Dữ liệu dự phòng
+    "postgresql://postgres:12345@localhost:5432/food_app_db" # Dữ liệu dự phòng
     )
 
 # Khởi tạo động cơ kết nối

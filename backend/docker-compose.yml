@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==========================================
   # 1. CỤM DATABASE (POSTGRESQL)
@@ -11,11 +9,11 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
+      POSTGRES_USER: food_app
       POSTGRES_PASSWORD: 123456 # Đặt pass cho DB
       POSTGRES_DB: food_app_db # Tên Database
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Lưu dữ liệu cứng, tắt Docker không bị mất
+      - postgres_data_new:/var/lib/postgresql/data # Lưu dữ liệu cứng, tắt Docker không bị mất
 
   # ==========================================
   # 2. CỤM BACKEND (FASTAPI)
@@ -25,7 +23,7 @@ services:
     container_name: food_ai_api
     restart: always
     ports:
-      - "8000:8000"
+      - "5000:8000"
     volumes:
       - .:/app # CỬA SỔ THẦN KỲ: Ánh xạ thư mục code bên ngoài vào thẳng Docker
     environment:
@@ -34,5 +32,21 @@ services:
     depends_on:
       - db # Chờ Database khởi động xong mới được chạy API
 
+  # ==========================================
+  # 3. CỤM FLYWAY (QUẢN LÝ MIGRATION DB)
+  # ==========================================
+  flyway:
+    image: flyway/flyway:9-alpine
+    container_name: food_ai_flyway
+    depends_on:
+      - db
+    volumes:
+      - ./db/migrations:/flyway/sql # Ánh xạ thư mục chứa script SQL vào Flyway
+    environment:
+      - FLYWAY_URL=jdbc:postgresql://db:5432/food_app_db
+      - FLYWAY_USER=postgres
+      - FLYWAY_PASSWORD=123456
+    command: migrate # Lệnh chạy khi container khởi động
+
 volumes:
-  postgres_data:
+  postgres_data_new:
