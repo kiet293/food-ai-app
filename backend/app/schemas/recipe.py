@@ -23,3 +23,6 @@ class RecipeSearchRequest(BaseModel):
 
 class RecipeSearchResponse(BaseModel):
     recipes: List[AIAnalysisResult]
+
+class CommentCreate(BaseModel):
+    content: str
