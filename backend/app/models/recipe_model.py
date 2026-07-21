@@ -86,5 +86,6 @@ class RatingDB(Base):
     score = Column(Integer, nullable=False) # VD: từ 1 đến 5 sao
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("UserDB")
