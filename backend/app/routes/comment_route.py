@@ -140,3 +140,50 @@ def update_comment(
             code="UPDATE_COMMENT_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# API XÓA BÌNH LUẬN
+@router.delete("/comments/{comment_id}")
+def delete_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # 1. Tìm comment trong database
+        comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+        if not comment:
+            raise CustomException(
+                message="Không tìm thấy bình luận",
+                code="COMMENT_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. Kiểm tra quyền sở hữu (chỉ tác giả hoặc Admin mới được xóa)
+        if comment.user_id != current_user.id and not current_user.is_admin:
+            raise CustomException(
+                message="Bạn không có quyền xóa bình luận này",
+                code="FORBIDDEN",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Tiến hành xóa
+        db.delete(comment)
+        db.commit()
+
+        # 4. Trả về kết quả
+        return success_response(
+            message="Đã xóa bình luận thành công!"
+        )
+
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Lỗi hệ thống khi xóa bình luận: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi xóa bình luận",
+            code="DELETE_COMMENT_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
