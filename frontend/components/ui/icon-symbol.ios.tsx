@@ -1,32 +1,28 @@
-import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
-import { StyleProp, ViewStyle } from 'react-native';
+import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleProp, TextStyle } from 'react-native';
 
 export function IconSymbol({
   name,
   size = 24,
   color,
   style,
-  weight = 'regular',
 }: {
-  name: SymbolViewProps['name'];
+  name: string;
   size?: number;
   color: string;
-  style?: StyleProp<ViewStyle>;
-  weight?: SymbolWeight;
+  style?: StyleProp<TextStyle>;
 }) {
-  return (
-    <SymbolView
-      weight={weight}
-      tintColor={color}
-      resizeMode="scaleAspectFit"
-      name={name}
-      style={[
-        {
-          width: size,
-          height: size,
-        },
-        style,
-      ]}
-    />
-  );
+  const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+    'compass.fill': 'compass',
+    'compass': 'compass-outline',
+    'play.circle.fill': 'play-circle',
+    'book.fill': 'book',
+    'person.fill': 'person',
+    'house.fill': 'home',
+    'magnifyingglass': 'search',
+  };
+
+  const iconName = iconMap[name] || 'ellipse';
+  return <Ionicons name={iconName} size={size} color={color} style={style} />;
 }

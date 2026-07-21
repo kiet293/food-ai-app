@@ -21,6 +21,11 @@ const MAPPING = {
   'book.fill': 'book',
   'flame.fill': 'whatshot',
   'person.fill': 'person',
+  'compass.fill': 'explore',
+  'globe': 'public',
+  'magnifyingglass': 'search',
+  'play.circle.fill': 'play-circle-filled',
+  'play.fill': 'play-arrow',
 } as IconMapping;
 
 /**

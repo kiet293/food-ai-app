@@ -14,34 +14,68 @@ import {
   View,
   Image,
   Pressable,
+  Dimensions,
 } from 'react-native';
-import { AIAnalysisResult } from '../../services/aiService';
-import { deleteRecipe, getSavedRecipes } from '../../services/aiService';
+import { Ionicons } from '@expo/vector-icons';
+import { AIAnalysisResult, deleteRecipe, getSavedRecipes } from '../../services/aiService';
+import { CreateCollectionModal } from '../../components/CreateCollectionModal';
+
+const { width } = Dimensions.get('window');
+const COLLECTION_CARD_WIDTH = (width - 44) / 2;
 
 interface SavedRecipe extends AIAnalysisResult {
   id: string;
   savedAt: string;
 }
 
+interface CollectionFolder {
+  id: string;
+  name: string;
+  recipeCount: number;
+  coverImage: string;
+}
+
+const INITIAL_COLLECTIONS: CollectionFolder[] = [
+  {
+    id: 'col-1',
+    name: '15 PHÚT MỖI NGÀY',
+    recipeCount: 5,
+    coverImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'col-2',
+    name: 'MEAL PREP TIỆN LỢI',
+    recipeCount: 3,
+    coverImage: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'col-3',
+    name: 'MÓN CHAY HEALTHY',
+    recipeCount: 4,
+    coverImage: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'col-4',
+    name: 'BÁNH NGỌT & DESSERT',
+    recipeCount: 6,
+    coverImage: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop&q=80',
+  },
+];
+
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '';
-
   let date = new Date(dateStr);
-
   if (isNaN(date.getTime())) {
     const parts = dateStr.split('/');
     if (parts.length === 3) {
       const day = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10) - 1;
       let year = parseInt(parts[2], 10);
-      // Nếu năm chỉ có 2 chữ số → cộng 2000
       if (year < 100) year += 2000;
       date = new Date(year, month, day);
     }
   }
-
-  if (isNaN(date.getTime())) return dateStr; // fallback: trả về chuỗi gốc
-
+  if (isNaN(date.getTime())) return dateStr;
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -50,7 +84,10 @@ const formatDate = (dateStr: string): string => {
 
 export default function NotebookScreen() {
   const [savedList, setSavedList] = useState<SavedRecipe[]>([]);
+  const [collections, setCollections] = useState<CollectionFolder[]>(INITIAL_COLLECTIONS);
   const [selectedRecipe, setSelectedRecipe] = useState<SavedRecipe | null>(null);
+  const [selectedCollectionFilter, setSelectedCollectionFilter] = useState<string | null>(null);
+  const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
 
   const loadData = async () => {
     const data = await getSavedRecipes();
@@ -82,64 +119,163 @@ export default function NotebookScreen() {
     );
   };
 
-  const renderItem = ({ item, index }: { item: SavedRecipe; index: number }) => {
-    const accentColors = ['#2ecc71', '#e67e22', '#e74c3c', '#3498db', '#9b59b6'];
-    const accent = accentColors[index % accentColors.length];
-
-    return (
-      <TouchableOpacity
-        style={[styles.card, { borderLeftColor: accent }]}
-        onPress={() => setSelectedRecipe(item)}
-        onLongPress={() => confirmDelete(item.id, item.recipeName)}
-        activeOpacity={0.75}
-      >
-        {/* ✅ Ngày nằm riêng trên 1 dòng, không tranh chỗ với tên */}
-        <View style={styles.cardTopRow}>
-          <View style={[styles.accentDot, { backgroundColor: accent }]} />
-          <Text style={styles.dateText}>📅 {formatDate(item.savedAt)}</Text>
-        </View>
-
-        <Text style={styles.recipeName}>{item.recipeName}</Text>
-
-        <Text style={styles.ingredientsSummary} numberOfLines={1}>
-          🛒 {item.ingredients.map((i) => i.name).join(' · ')}
-        </Text>
-
-        <View style={styles.cardFooter}>
-          <Text style={styles.hintText}>Chạm để xem  •  Nhấn giữ để xóa</Text>
-          <Text style={styles.arrowIcon}>›</Text>
-        </View>
-      </TouchableOpacity>
-    );
+  const handleCreateCollection = (name: string) => {
+    const newCol: CollectionFolder = {
+      id: `col-${Date.now()}`,
+      name: name.toUpperCase(),
+      recipeCount: 0,
+      coverImage: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop&q=80',
+    };
+    setCollections([newCol, ...collections]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Sổ tay ẩm thực 📖</Text>
-        <Text style={styles.headerSub}>Tổng hợp {savedList.length} công thức đã lưu của bạn</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+      {/* Top Header Row Pepper UI */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity style={styles.infoBtn}>
+          <Ionicons name="information-circle-outline" size={24} color="#111" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>COLLECTIONS.</Text>
+        <TouchableOpacity style={styles.infoBtn} onPress={() => setIsCreateCollectionOpen(true)}>
+          <Ionicons name="add" size={26} color="#28a745" />
+        </TouchableOpacity>
       </View>
 
-      {savedList.length > 0 ? (
-        <FlatList
-          data={savedList}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🍳</Text>
-          <Text style={styles.emptyTitle}>Chưa có công thức nào</Text>
-          <Text style={styles.emptyText}>
-            Hãy chụp ảnh nguyên liệu ở trang Home để bắt đầu lưu công thức nhé!
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+        {/* ALL SAVED. Pill Card */}
+        <TouchableOpacity
+          style={[styles.allSavedCard, !selectedCollectionFilter && styles.allSavedCardActive]}
+          onPress={() => setSelectedCollectionFilter(null)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.bookmarkRing}>
+            <Ionicons name="bookmark-outline" size={24} color="#28a745" />
+          </View>
+          <View style={styles.allSavedTextWrap}>
+            <Text style={styles.allSavedTitle}>ALL SAVED.</Text>
+            <Text style={styles.allSavedSub}>
+              {savedList.length} món đã lưu • 0 món đã nấu
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#bbb" />
+        </TouchableOpacity>
+
+        {/* Organize Recipes Hero Banner */}
+        <TouchableOpacity
+          style={styles.organizeBanner}
+          onPress={() => setIsCreateCollectionOpen(true)}
+          activeOpacity={0.9}
+        >
+          <Image
+            source={{
+              uri: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80',
+            }}
+            style={styles.bannerImg}
+          />
+          <View style={styles.starBadge}>
+            <Ionicons name="star" size={16} color="#fff" />
+          </View>
+          <View style={styles.bannerCenterPill}>
+            <Text style={styles.bannerPillTitle}>ORGANIZE RECIPES.</Text>
+            <Text style={styles.bannerPillSub}>Bấm để tạo bộ sưu tập mới (+)</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* User Collections Grid */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>BỘ SƯU TẬP THEO NHÓM.</Text>
+        </View>
+        <View style={styles.collectionsGrid}>
+          {collections.map((col) => {
+            const isSelected = selectedCollectionFilter === col.id;
+            return (
+              <TouchableOpacity
+                key={col.id}
+                style={[styles.colGridCard, isSelected && styles.colGridCardActive]}
+                onPress={() =>
+                  setSelectedCollectionFilter(isSelected ? null : col.id)
+                }
+              >
+                <Image source={{ uri: col.coverImage }} style={styles.colCoverImg} />
+                <View style={styles.colOverlay} />
+                <View style={styles.colStarBadge}>
+                  <Ionicons name="star-outline" size={14} color="#fff" />
+                </View>
+                <View style={styles.colContent}>
+                  <Text style={styles.colName}>{col.name}</Text>
+                  <Text style={styles.colSub}>{col.recipeCount} recipes</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Saved Recipes List */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedCollectionFilter
+              ? `CÔNG THỨC TRONG NÓM`
+              : `TẤT CẢ CÔNG THỨC ĐÃ LƯU.`}
           </Text>
         </View>
-      )}
 
-      {/* Modal chi tiết */}
+        {savedList.length > 0 ? (
+          <View style={styles.recipesList}>
+            {savedList.map((item, index) => {
+              const accentColors = ['#28a745', '#3498db', '#e67e22', '#9b59b6'];
+              const accent = accentColors[index % accentColors.length];
+
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.recipeCard, { borderLeftColor: accent }]}
+                  onPress={() => setSelectedRecipe(item)}
+                  onLongPress={() => confirmDelete(item.id, item.recipeName)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.recipeTopRow}>
+                    <View style={[styles.dot, { backgroundColor: accent }]} />
+                    <Text style={styles.recipeDate}>📅 {formatDate(item.savedAt)}</Text>
+                  </View>
+
+                  <Text style={styles.recipeName}>{item.recipeName}</Text>
+
+                  <Text style={styles.ingredientsSummary} numberOfLines={1}>
+                    🛒 {item.ingredients.map((i) => i.name).join(' · ')}
+                  </Text>
+
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.hintText}>Chạm để xem  •  Nhấn giữ để xóa</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#aaa" />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyEmoji}>🍳</Text>
+            <Text style={styles.emptyTitle}>Chưa có công thức nào</Text>
+            <Text style={styles.emptySub}>
+              Hãy quét ảnh hoặc tìm kiếm ở trang Khám Phá để bắt đầu lưu công thức nhé!
+            </Text>
+          </View>
+        )}
+
+        <View style={{ height: 60 }} />
+      </ScrollView>
+
+      {/* Modal create collection */}
+      <CreateCollectionModal
+        visible={isCreateCollectionOpen}
+        onClose={() => setIsCreateCollectionOpen(false)}
+        onCreateCollection={handleCreateCollection}
+      />
+
+      {/* Recipe Detail Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -151,12 +287,9 @@ export default function NotebookScreen() {
           <View style={styles.modalContent}>
             {selectedRecipe && (
               <>
-                {/* Handle bar */}
                 <View style={styles.handleBar} />
-
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{selectedRecipe.recipeName}</Text>
-                  {/* ✅ Ngày trong modal cũng được format đúng */}
                   <Text style={styles.modalDate}>
                     📅 Lưu ngày: {formatDate(selectedRecipe.savedAt)}
                   </Text>
@@ -166,13 +299,13 @@ export default function NotebookScreen() {
                   {selectedRecipe.imageUrl && (
                     <Image
                       source={{ uri: selectedRecipe.imageUrl }}
-                      style={styles.recipeImage}
+                      style={styles.recipeHeroImg}
                       resizeMode="cover"
                     />
                   )}
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>🛒 Nguyên liệu</Text>
+                    <Text style={styles.sectionTitleModal}>🛒 Nguyên liệu</Text>
                     {selectedRecipe.ingredients.map((item, index) => (
                       <View key={index} style={styles.ingredientRow}>
                         <View style={styles.ingredientDot} />
@@ -185,7 +318,7 @@ export default function NotebookScreen() {
                   </View>
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>🍳 Cách làm</Text>
+                    <Text style={styles.sectionTitleModal}>🍳 Cách làm</Text>
                     {selectedRecipe.instructions.map((step, index) => (
                       <View key={index} style={styles.stepRow}>
                         <View style={styles.stepNumber}>
@@ -218,80 +351,215 @@ export default function NotebookScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f0',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    backgroundColor: '#fff',
   },
-
-  // ── Header ──────────────────────────────────────────────
-  header: {
+  topHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#f0f4f0',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  infoBtn: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#2ecc71',
-    letterSpacing: 0.2,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#111',
+    letterSpacing: 1,
   },
-  headerSub: {
+  allSavedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#eef0f2',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+  allSavedCardActive: {
+    borderColor: '#28a745',
+    backgroundColor: '#f8fdf9',
+  },
+  bookmarkRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#28a745',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  allSavedTextWrap: {
+    flex: 1,
+  },
+  allSavedTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#111',
+    letterSpacing: 0.5,
+  },
+  allSavedSub: {
     fontSize: 13,
     color: '#888',
-    marginTop: 4,
-    textAlign: 'center',
+    marginTop: 2,
   },
-
-  // ── List ────────────────────────────────────────────────
-  listContent: {
+  organizeBanner: {
+    height: 140,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  bannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  starBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ffc107',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerCenterPill: {
+    position: 'absolute',
+    top: '25%',
+    left: '10%',
+    right: '10%',
+    backgroundColor: '#111',
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
+    borderRadius: 10,
+    alignItems: 'center',
   },
-
-  // ── Card ────────────────────────────────────────────────
-  card: {
+  bannerPillTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  bannerPillSub: {
+    color: '#ccc',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#111',
+    letterSpacing: 0.5,
+  },
+  collectionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  colGridCard: {
+    width: COLLECTION_CARD_WIDTH,
+    height: 110,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  colGridCardActive: {
+    borderWidth: 2,
+    borderColor: '#28a745',
+  },
+  colCoverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  colOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  colStarBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+  },
+  colContent: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+  },
+  colName: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  colSub: {
+    color: '#e0e0e0',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  recipesList: {
+    paddingHorizontal: 16,
+  },
+  recipeCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
-    shadowColor: '#1a3a1a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
     borderLeftWidth: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#f0f2f5',
   },
-  // ✅ Dòng trên: dấu chấm accent + ngày (không có tên → không bị đẩy)
-  cardTopRow: {
+  recipeTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  accentDot: {
+  dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     marginRight: 6,
   },
-  dateText: {
+  recipeDate: {
     fontSize: 11,
-    color: '#8aab8a',
+    color: '#888',
     fontWeight: '500',
   },
-  // Tên món ở dòng riêng → không bao giờ bị cắt
   recipeName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1a3a1a',
-    lineHeight: 22,
-    marginBottom: 6,
+    color: '#111',
+    marginBottom: 4,
   },
   ingredientsSummary: {
     fontSize: 13,
-    color: '#6b8f6b',
+    color: '#666',
     marginBottom: 8,
   },
   cardFooter: {
@@ -299,175 +567,148 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f0f4f0',
+    borderTopColor: '#f5f5f5',
     paddingTop: 8,
-    marginTop: 2,
   },
   hintText: {
     fontSize: 11,
-    color: '#adc6ad',
+    color: '#aaa',
   },
-  arrowIcon: {
-    fontSize: 18,
-    color: '#adc6ad',
-    fontWeight: '300',
-  },
-
-  // ── Empty ───────────────────────────────────────────────
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  emptyBox: {
     alignItems: 'center',
-    paddingHorizontal: 40,
+    padding: 30,
   },
   emptyEmoji: {
-    fontSize: 56,
-    marginBottom: 16,
+    fontSize: 48,
+    marginBottom: 10,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#3a5a3a',
-    marginBottom: 8,
+    color: '#333',
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#8aab8a',
+  emptySub: {
+    fontSize: 13,
+    color: '#888',
     textAlign: 'center',
-    lineHeight: 22,
+    marginTop: 4,
   },
-
-  // ── Modal ───────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   modalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '82%',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    height: '80%',
+    padding: 20,
   },
   handleBar: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#dde8dd',
+    backgroundColor: '#ddd',
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 16,
+    marginBottom: 14,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#e8f0e8',
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
     textAlign: 'center',
-    lineHeight: 28,
   },
   modalDate: {
     fontSize: 12,
-    color: '#8aab8a',
-    marginTop: 6,
+    color: '#888',
+    marginTop: 4,
   },
   modalBody: {
     flex: 1,
   },
-  recipeImage: {
+  recipeHeroImg: {
     width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 16,
-    backgroundColor: '#e8f0e8',
+    height: 180,
+    borderRadius: 14,
+    marginBottom: 14,
   },
   sectionBox: {
-    backgroundColor: '#f7fbf7',
+    backgroundColor: '#f8f9fa',
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
+  sectionTitleModal: {
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a3a1a',
-    marginBottom: 10,
+    color: '#222',
+    marginBottom: 8,
   },
   ingredientRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   ingredientDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2ecc71',
-    marginRight: 10,
+    backgroundColor: '#28a745',
+    marginRight: 8,
   },
   itemText: {
-    fontSize: 15,
-    color: '#2d4a2d',
-    flex: 1,
+    fontSize: 14,
+    color: '#444',
   },
   probabilityText: {
-    color: '#8aab8a',
-    fontSize: 13,
+    color: '#888',
+    fontSize: 12,
   },
   stepRow: {
     flexDirection: 'row',
-    marginBottom: 10,
-    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#2ecc71',
-    alignItems: 'center',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#28a745',
     justifyContent: 'center',
-    marginRight: 10,
-    marginTop: 1,
-    flexShrink: 0,
+    alignItems: 'center',
+    marginRight: 8,
   },
   stepNumberText: {
-    fontSize: 12,
-    fontWeight: '700',
     color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   stepText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#2d4a2d',
+    fontSize: 14,
+    color: '#444',
     flex: 1,
+    lineHeight: 20,
   },
   closeButton: {
-    backgroundColor: '#1a3a1a',
+    backgroundColor: '#28a745',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
   closeButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.5,
   },
 });
