@@ -10,7 +10,7 @@ from app.utils.response import success_response, CustomException
 router = APIRouter(tags=["Comments"])
 
 # API ĐĂNG BÌNH LUẬN (US-04)
-@router.post("/{recipe_id}/comments")
+@router.post("/recipes/{recipe_id}/comments")
 def add_comment(
     recipe_id: int,
     comment_data: CommentCreate = Body(...),
@@ -70,5 +70,73 @@ def add_comment(
         raise CustomException(
             message="Lỗi hệ thống khi lưu bình luận",
             code="CREATE_COMMENT_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+# API SỬA BÌNH LUẬN
+@router.put("/comments/{comment_id}")
+def update_comment(
+    comment_id: int,
+    comment_data: CommentCreate = Body(...),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # 1. Tìm comment trong database
+        comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+        if not comment:
+            raise CustomException(
+                message="Không tìm thấy bình luận",
+                code="COMMENT_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. Kiểm tra quyền sở hữu (chỉ tác giả mới được sửa)
+        if comment.user_id != current_user.id:
+            raise CustomException(
+                message="Bạn không có quyền sửa bình luận này",
+                code="FORBIDDEN",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Validate dữ liệu
+        new_content = comment_data.content.strip()
+        if not new_content:
+            raise CustomException(
+                message="Nội dung bình luận không được để trống",
+                code="INVALID_COMMENT",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 4. Cập nhật dữ liệu
+        comment.content = new_content
+        db.commit()
+        db.refresh(comment)
+
+        # 5. Trả về kết quả
+        return success_response(
+            data={
+                "id": comment.id,
+                "user": {
+                    "id": current_user.id,
+                    "name": current_user.full_name or current_user.username,
+                    "avatar": current_user.avatar
+                },
+                "content": comment.content,
+                "created_at": comment.created_at.isoformat() if comment.created_at else None
+            },
+            message="Cập nhật bình luận thành công!"
+        )
+
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Lỗi hệ thống khi sửa bình luận: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi cập nhật bình luận",
+            code="UPDATE_COMMENT_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -28,7 +28,7 @@ app.add_middleware(
 app.include_router(auth_route.router, prefix="/api/auth", tags=["Authentication"]) # <--- Đăng ký API
 app.include_router(ai_route.router, prefix="/api", tags=["AI Analysis"])
 app.include_router(recipe_route.router, prefix="/api/recipes", tags=["Recipe Management"])
-app.include_router(comment_route.router, prefix="/api/recipes")
+app.include_router(comment_route.router, prefix="/api")
 app.include_router(search_route.router, prefix="/api/search", tags=["Search API"])
 
 # Khai báo cấu hình Cloudinary trong quá trình khởi động ứng dụng
