@@ -39,7 +39,7 @@ cloudinary.config(
   secure = True
 )
 
-# Một API nhỏ để kiểm tra xem Server có đang sống không
+# Một API nhỏ để kiểm tra xem Server có đang sống không (reload)
 @app.get("/")
 def read_root():
     return {"message": "Server đang chạy cùng Database PostgreSQL!"}
