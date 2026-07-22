@@ -60,6 +60,7 @@ def format_recipe_summary(recipe: RecipeDB):
         author_info = {
             "id": recipe.author.id,
             "name": recipe.author.full_name or recipe.author.username,
+            "handle": f"@{recipe.author.username}",
             "avatar": recipe.author.avatar
         }
     
@@ -76,6 +77,8 @@ def format_recipe_summary(recipe: RecipeDB):
         "ratings_avg": round(ratings_avg, 1),
         "ratings_count": len(ratings_list),
         "comments_count": len(recipe.comments) if recipe.comments else 0,
+        "save_count": 0, # Tạm thời trả về 0 theo kế hoạch
+        "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
 
@@ -315,6 +318,43 @@ def get_explore_grid(
             code="EXPLORE_GRID_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# ====================================================================================================
+# API EXPLORE FEED (Sử dụng Cursor-based pagination bằng ID, trả về full chi tiết)
+# ====================================================================================================
+@router.get("/explore-feed")
+def get_explore_feed(
+    start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
+    limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
+    db: Session = Depends(get_db)
+):
+    try:
+        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        
+        # Lấy từ start_id trở xuống
+        if start_id:
+            query = query.filter(RecipeDB.id <= start_id)
+            
+        recipes = query.limit(limit).all()
+        
+        next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
+        
+        result_list = [format_recipe_summary(r) for r in recipes]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy explore feed: {e}")
+        raise CustomException(
+            message="Lỗi khi lấy danh sách feed",
+            code="EXPLORE_FEED_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 # API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
 @router.get("/{recipe_id}")

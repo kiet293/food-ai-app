@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, FlatList, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { fetchExploreGrid, ExploreGridItem } from '@/services/exploreService';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_WIDTH = (width - 44) / 3;
 
 export const ExploreGridSection: React.FC = () => {
+  const router = useRouter();
   const [data, setData] = useState<ExploreGridItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +34,12 @@ export const ExploreGridSection: React.FC = () => {
   }, []);
 
   const renderItem = ({ item }: { item: ExploreGridItem }) => (
-    <TouchableOpacity key={item.id} style={styles.gridItem}>
+    <TouchableOpacity 
+      key={item.id} 
+      style={styles.gridItem}
+      onPress={() => router.push({ pathname: "/explore-detail/[id]", params: { id: item.id } })}
+      activeOpacity={0.8}
+    >
       <Image source={{ uri: item.image }} style={styles.gridImage} />
     </TouchableOpacity>
   );
@@ -47,7 +54,9 @@ export const ExploreGridSection: React.FC = () => {
         numColumns={3}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        onEndReached={loadMore}
+        onEndReached={() => {
+          if (data.length > 0) loadMore();
+        }}
         onEndReachedThreshold={0.5}
         contentContainerStyle={styles.gridContainer}
         columnWrapperStyle={styles.columnWrapper}
