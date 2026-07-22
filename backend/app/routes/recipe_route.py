@@ -271,6 +271,51 @@ def create_recipe(
         )
 
 
+# ====================================================================================================
+# API EXPLORE GRID (Sử dụng Cursor-based pagination bằng ID)
+# ====================================================================================================
+@router.get("/explore-grid")
+def get_explore_grid(
+    cursor: int = Query(None, description="ID của công thức cuối cùng ở lần tải trước"),
+    limit: int = Query(18, ge=1, le=50, description="Số lượng ảnh cần lấy"),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Sắp xếp mới nhất lên đầu (dựa vào ID giảm dần cho nhanh và chính xác)
+        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        
+        # Nếu có cursor, chỉ lấy các bài viết cũ hơn bài viết có ID = cursor
+        if cursor:
+            query = query.filter(RecipeDB.id < cursor)
+            
+        recipes = query.limit(limit).all()
+        
+        # Xác định next_cursor
+        next_cursor = recipes[-1].id if len(recipes) == limit else None
+        
+        # Format trả về chỉ cần id và image_url để hiển thị Grid cho nhẹ
+        result_list = [
+            {
+                "id": r.id,
+                "image": r.image_url or "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500"
+            }
+            for r in recipes
+        ]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy explore grid: {e}")
+        raise CustomException(
+            message="Lỗi khi lấy danh sách khám phá",
+            code="EXPLORE_GRID_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 # API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
 @router.get("/{recipe_id}")
 def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
