@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { fetchRecipeDetails, RecipeDetails } from '@/services/exploreService';
+import { fetchRecipeDetails, postRecipeComment, RecipeDetails, CommentInfo } from '@/services/exploreService';
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -26,16 +26,150 @@ export default function RecipeDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'recipe' | 'comments'>('recipe');
   const [commentText, setCommentText] = useState('');
+  const [replyTo, setReplyTo] = useState<{ id: number; name: string } | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
+  const loadData = async () => {
+    if (!id) return;
+    const data = await fetchRecipeDetails(parseInt(id as string, 10));
+    setRecipe(data);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      setIsLoading(true);
-      const data = await fetchRecipeDetails(parseInt(id as string, 10));
-      setRecipe(data);
-      setIsLoading(false);
-    };
     loadData();
+    
+    // Polling every 5 seconds to get new comments
+    const interval = setInterval(() => {
+      if (id) {
+        fetchRecipeDetails(parseInt(id as string, 10)).then(data => {
+          if (data) setRecipe(data);
+        });
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [id]);
+
+  const handlePostComment = async () => {
+    if (!commentText.trim() || !recipe || isPosting) return;
+    setIsPosting(true);
+
+    const recipeId = parseInt(id as string, 10);
+    const parentId = replyTo ? replyTo.id : undefined;
+    
+    // Optimistic UI Update (Cập nhật tạm thời lên màn hình)
+    const tempComment: CommentInfo = {
+      id: Math.random(), // ID tạm
+      content: commentText.trim(),
+      created_at: new Date().toISOString(),
+      user: { id: 0, name: 'You', handle: 'you', avatar: '' }, // Thông tin giả định
+      is_author: false,
+      replies: []
+    };
+
+    setRecipe(prev => {
+      if (!prev) return prev;
+      const newComments = [...(prev.comments || [])];
+      
+      if (parentId) {
+        // Tìm comment cha để nhét vào (Chỉ hỗ trợ đệ quy 1 tầng tìm kiếm tạm thời)
+        const addReply = (comments: CommentInfo[]) => {
+          for (let c of comments) {
+            if (c.id === parentId) {
+              c.replies = c.replies ? [...c.replies, tempComment] : [tempComment];
+              return true;
+            }
+            if (c.replies && addReply(c.replies)) return true;
+          }
+          return false;
+        };
+        addReply(newComments);
+      } else {
+        newComments.push(tempComment);
+      }
+      
+      return { ...prev, comments: newComments };
+    });
+
+    setCommentText('');
+    setReplyTo(null);
+
+    // Gửi API thật
+    await postRecipeComment(recipeId, tempComment.content, parentId);
+    
+    // Sau khi POST xong thì load lại data chuẩn từ server
+    await loadData();
+    setIsPosting(false);
+  };
+
+  const renderComment = (comment: CommentInfo, depth: number = 0, isLast: boolean = true) => {
+    return (
+      <View key={comment.id} style={{ marginBottom: 16, position: 'relative' }}>
+        {depth > 0 && (
+          <>
+            {/* Đường thẳng đứng nối xuống bình luận tiếp theo (nếu không phải bình luận cuối cùng) */}
+            {!isLast && (
+              <View style={{
+                position: 'absolute',
+                left: -24,
+                top: 18,
+                bottom: -16,
+                borderLeftWidth: 2,
+                borderColor: '#ddd'
+              }} />
+            )}
+            
+            {/* Đường cong (chữ L) chĩa vào avatar */}
+            <View style={{
+              position: 'absolute',
+              left: -24,
+              top: 0,
+              width: 24,
+              height: 18,
+              borderLeftWidth: 2,
+              borderBottomWidth: 2,
+              borderColor: '#ddd',
+              borderBottomLeftRadius: 12,
+            }} />
+          </>
+        )}
+
+        <View style={styles.commentItem}>
+          {comment.user?.avatar ? (
+            <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatarImage} />
+          ) : (
+            <View style={styles.commentAvatar}>
+              <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
+            </View>
+          )}
+          <View style={styles.commentContent}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.commentUser}>{comment.user?.name || 'User'}</Text>
+              {comment.is_author && (
+                <View style={styles.authorBadge}>
+                  <Text style={styles.authorBadgeText}>Tác giả</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.commentText}>{comment.content}</Text>
+            <TouchableOpacity 
+              style={{ marginTop: 4 }} 
+              onPress={() => setReplyTo({ id: comment.id, name: comment.user?.name || 'User' })}
+            >
+              <Text style={styles.replyBtnText}>Trả lời</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        {comment.replies && comment.replies.length > 0 && (
+          <View style={{ marginTop: 8, marginLeft: 42 }}>
+            {comment.replies.map((reply, index) => 
+              renderComment(reply, depth + 1, index === comment.replies!.length - 1)
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
   if (isLoading || !recipe) {
     return (
       <SafeAreaView style={styles.loadingArea}>
@@ -193,42 +327,49 @@ export default function RecipeDetailScreen() {
             <View style={styles.commentsTabContainer}>
               <View style={styles.commentsList}>
                 {recipe.comments && recipe.comments.length > 0 ? (
-                  recipe.comments.map((comment, idx) => (
-                    <View key={idx} style={styles.commentItem}>
-                      <View style={styles.commentAvatar}>
-                        <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
-                      </View>
-                      <View style={styles.commentContent}>
-                        <Text style={styles.commentUser}>{comment.user?.name || 'User'}</Text>
-                        <Text style={styles.commentText}>{comment.content}</Text>
-                      </View>
-                    </View>
-                  ))
+                  recipe.comments.map(comment => renderComment(comment, 0))
                 ) : (
                   <Text style={styles.emptyText}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
                 )}
-              </View>
-              
-              <View style={styles.commentInputContainer}>
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Thêm bình luận..."
-                  placeholderTextColor="#999"
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                />
-                <TouchableOpacity 
-                  style={[styles.postCommentBtn, !commentText.trim() && { opacity: 0.5 }]}
-                  disabled={!commentText.trim()}
-                >
-                  <Ionicons name="send" size={20} color="#fff" />
-                </TouchableOpacity>
               </View>
             </View>
           )}
         </View>
       </ScrollView>
+
+      {activeTab === 'comments' && (
+        <View style={styles.commentInputWrapper}>
+          {replyTo && (
+            <View style={styles.replyingToContainer}>
+              <Text style={styles.replyingToText}>Đang trả lời {replyTo.name}</Text>
+              <TouchableOpacity onPress={() => setReplyTo(null)}>
+                <Ionicons name="close-circle" size={20} color="#999" />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder={replyTo ? "Viết câu trả lời..." : "Thêm bình luận..."}
+              placeholderTextColor="#999"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+            />
+            <TouchableOpacity 
+              style={[styles.postCommentBtn, (!commentText.trim() || isPosting) && { opacity: 0.5 }]}
+              disabled={!commentText.trim() || isPosting}
+              onPress={handlePostComment}
+            >
+              {isPosting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="send" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -503,10 +644,10 @@ const styles = StyleSheet.create({
   commentsList: {
     padding: 16,
     flex: 1,
+    paddingBottom: 40,
   },
   commentItem: {
     flexDirection: 'row',
-    marginBottom: 16,
   },
   commentAvatar: {
     width: 36,
@@ -515,7 +656,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff5a5f',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
+  },
+  commentAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
   },
   commentAvatarText: {
     color: '#fff',
@@ -524,32 +671,59 @@ const styles = StyleSheet.create({
   },
   commentContent: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 12,
+    backgroundColor: '#f5f5f5',
+    padding: 10,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   commentUser: {
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
     color: '#333',
-    marginBottom: 4,
+    marginRight: 6,
+  },
+  authorBadge: {
+    backgroundColor: '#ff5a5f',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  authorBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   commentText: {
     fontSize: 14,
-    color: '#555',
+    color: '#444',
     lineHeight: 20,
+    marginTop: 2,
+  },
+  replyBtnText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  commentInputWrapper: {
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  replyingToContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  replyingToText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
   },
   commentInputContainer: {
     flexDirection: 'row',
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
     alignItems: 'flex-end',
   },
   commentInput: {

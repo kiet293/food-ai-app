@@ -378,10 +378,12 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
         recipe_data["instructions"] = recipe.instructions
         recipe_data["servings"] = recipe.servings
         
-        # Bổ sung nội dung chi tiết bình luận (comments array)
-        comments_list = []
+        # Bổ sung nội dung chi tiết bình luận dạng cây (comments array)
+        comments_dict = {}
+        root_comments = []
         if recipe.comments:
-            for c in recipe.comments:
+            sorted_comments = sorted(recipe.comments, key=lambda x: x.id)
+            for c in sorted_comments:
                 user_info = None
                 if c.user:
                     user_info = {
@@ -389,13 +391,23 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
                         "name": c.user.full_name or c.user.username,
                         "avatar": c.user.avatar
                     }
-                comments_list.append({
+                comment_obj = {
                     "id": c.id,
                     "content": c.content,
                     "created_at": c.created_at.isoformat() if c.created_at else None,
-                    "user": user_info
-                })
-        recipe_data["comments"] = comments_list
+                    "user": user_info,
+                    "is_author": c.user_id == recipe.user_id,
+                    "replies": []
+                }
+                comments_dict[c.id] = comment_obj
+                
+            for c in sorted_comments:
+                if getattr(c, "parent_comment_id", None) and getattr(c, "parent_comment_id") in comments_dict:
+                    comments_dict[c.parent_comment_id]["replies"].append(comments_dict[c.id])
+                else:
+                    root_comments.append(comments_dict[c.id])
+                    
+        recipe_data["comments"] = root_comments
         
         return success_response(data=recipe_data, message="Lấy thông tin chi tiết công thức thành công")
         

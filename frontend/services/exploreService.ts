@@ -1,5 +1,11 @@
 import Constants from 'expo-constants';
+import { getToken } from './authService';
 
+export const getApiBaseUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
+  return `http://${ipAddress}:5000/api`;
+};
 export interface ExploreGridItem {
   id: number;
   image: string;
@@ -20,11 +26,9 @@ export const fetchExploreGrid = async (cursor: number | null = null, limit: numb
     }
     
     // Gọi API
-    const hostUri = Constants.expoConfig?.hostUri;
-    const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
-    const API_RECIPES = `http://${ipAddress}:5000/api/recipes`;
+    const API_BASE_URL = getApiBaseUrl();
 
-    const response = await fetch(`${API_RECIPES}/explore-grid?${queryParams.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/recipes/explore-grid?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -102,22 +106,30 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
     return { items: [], next_cursor: null };
   }
 };
+export interface CommentInfo {
+  id: number;
+  content: string;
+  created_at: string;
+  user: AuthorInfo | null;
+  is_author?: boolean;
+  replies?: CommentInfo[];
+  parent_comment_id?: number;
+}
+
 export interface RecipeDetails extends ExploreFeedItem {
   description?: string;
   category?: string;
   ingredients?: any;
   instructions?: any;
   servings?: number;
-  comments?: any[];
+  comments?: CommentInfo[];
 }
 
 export const fetchRecipeDetails = async (id: number): Promise<RecipeDetails | null> => {
   try {
-    const hostUri = Constants.expoConfig?.hostUri;
-    const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
-    const API_RECIPES = `http://${ipAddress}:5000/api/recipes`;
+    const API_BASE_URL = getApiBaseUrl();
 
-    const response = await fetch(`${API_RECIPES}/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -132,6 +144,35 @@ export const fetchRecipeDetails = async (id: number): Promise<RecipeDetails | nu
     return json.data || null;
   } catch (error) {
     console.error("❌ Lỗi lấy chi tiết công thức:", error);
+    return null;
+  }
+};
+
+export const postRecipeComment = async (recipeId: number, content: string, parentCommentId?: number): Promise<CommentInfo | null> => {
+  try {
+    const token = await getToken();
+    const API_BASE_URL = getApiBaseUrl();
+
+    const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        content,
+        parent_comment_id: parentCommentId || null
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to post comment');
+    }
+    
+    const json = await response.json();
+    return json.data;
+  } catch (error) {
+    console.error("❌ Lỗi khi đăng bình luận:", error);
     return null;
   }
 };
