@@ -11,6 +11,44 @@ export interface ExploreGridItem {
   image: string;
 }
 
+export interface CategoryItem {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export const fetchCategories = async (): Promise<CategoryItem[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/recipes/categories`);
+    const data = await response.json();
+    if (data.status === 'success') {
+      return data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+export const createRecipe = async (formData: FormData): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/recipes/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+    const data = await response.json();
+    return data.status === 'success';
+  } catch (error) {
+    console.error('Error creating recipe:', error);
+    return false;
+  }
+};
+
 export interface ExploreGridResponse {
   items: ExploreGridItem[];
   next_cursor: number | null;

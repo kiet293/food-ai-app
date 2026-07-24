@@ -116,7 +116,10 @@ export default function ExploreDetailScreen() {
 
           <View style={styles.dividerVertical} />
 
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => router.push(`/recipe/${item.id}?tab=comments` as any)}
+          >
             <Feather name="message-circle" size={24} color="#555" />
             <Text style={styles.actionText}>{item.comments_count || 0}</Text>
           </TouchableOpacity>

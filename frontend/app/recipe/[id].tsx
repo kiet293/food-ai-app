@@ -20,11 +20,11 @@ import { fetchRecipeDetails, postRecipeComment, RecipeDetails, CommentInfo } fro
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
 
   const [recipe, setRecipe] = useState<RecipeDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'recipe' | 'comments'>('recipe');
+  const [activeTab, setActiveTab] = useState<'recipe' | 'comments'>(tab === 'comments' ? 'comments' : 'recipe');
   const [commentText, setCommentText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: number; name: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);

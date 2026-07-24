@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserProfile } from '@/services/authService';
@@ -98,6 +98,18 @@ export default function HomeScreen() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [activePostForModal, setActivePostForModal] = useState<PostItem | null>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshTrigger(prev => prev + 1);
+    // Fake loading delay for other mock sections
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -203,7 +215,13 @@ export default function HomeScreen() {
 
       {/* Main Content Area */}
       {activeTab === 'GLOBAL' ? (
-        <ScrollView style={styles.contentScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.contentScroll} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
+          }
+        >
           {/* AI Meal Suggestion Banner */}
           <AiMealSuggestionBanner />
 
@@ -222,7 +240,7 @@ export default function HomeScreen() {
             selectedTag={selectedTag}
             setSelectedTag={setSelectedTag}
           />
-          <ExploreGridSection />
+          <ExploreGridSection refreshTrigger={refreshTrigger} />
 
           <View style={{ height: 100 }} />
         </ScrollView>
