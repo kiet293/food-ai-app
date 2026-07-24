@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState, createContext, useContext } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getUserProfile, logoutUser } from '../services/authService';
@@ -72,20 +73,22 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider value={{
-      isAuthenticated,
-      signIn: () => setIsAuthenticated(true),
-      signOut: () => setIsAuthenticated(false),
-    }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="search" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </AuthContext.Provider>
+    <SafeAreaProvider>
+      <AuthContext.Provider value={{
+        isAuthenticated,
+        signIn: () => setIsAuthenticated(true),
+        signOut: () => setIsAuthenticated(false),
+      }}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="search" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </AuthContext.Provider>
+    </SafeAreaProvider>
   );
 }
