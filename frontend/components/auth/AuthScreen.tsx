@@ -10,7 +10,7 @@ import {
     KeyboardAvoidingView,
     Platform
 } from 'react-native';
-import { authenticateUser } from '../services/authService';
+import { authenticateUser } from '../../services/authService';
 
 // Truyền prop onLoginSuccess để báo cho App biết là đã đăng nhập thành công
 export default function AuthScreen({ onLoginSuccess }: { onLoginSuccess: () => void }) {

@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserProfile } from '@/services/authService';
@@ -15,6 +15,7 @@ import {
   ChefItem,
   TrendingRecipeItem,
 } from '@/services/mockCommunityData';
+import { fetchHotTags, TagInfo } from '@/services/tagService';
 
 // Modular Refactored Components
 import { HomeHeader } from '@/components/explore/HomeHeader';
@@ -29,9 +30,9 @@ import { HotTagsSection } from '@/components/explore/HotTagsSection';
 import { ExploreGridSection } from '@/components/explore/ExploreGridSection';
 import { FollowingFeedSection } from '@/components/explore/FollowingFeedSection';
 import { IngredientDetailModal } from '@/components/explore/IngredientDetailModal';
-import { CreatePostModal } from '@/components/CreatePostModal';
-import { CommentModal } from '@/components/CommentModal';
-import { SharePostModal } from '@/components/SharePostModal';
+import { CreatePostModal } from '@/components/community/CreatePostModal';
+import { CommentModal } from '@/components/community/CommentModal';
+import { SharePostModal } from '@/components/community/SharePostModal';
 
 const ingredientCardsData: IngredientCard[] = [
   {
@@ -92,6 +93,15 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<PostItem[]>(MOCK_POSTS);
   const [chefs, setChefs] = useState<ChefItem[]>(MOCK_CHEFS);
   const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>(MOCK_TRENDING_RECIPES);
+  const [hotTags, setHotTags] = useState<TagInfo[]>([]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      const tags = await fetchHotTags();
+      if (tags) setHotTags(tags);
+    };
+    loadTags();
+  }, []);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -236,7 +246,7 @@ export default function HomeScreen() {
             toggleSaveTrending={toggleSaveTrending}
           />
           <HotTagsSection
-            tags={MOCK_HOT_TAGS}
+            tags={hotTags.length > 0 ? hotTags.map(t => t.name) : MOCK_HOT_TAGS}
             selectedTag={selectedTag}
             setSelectedTag={setSelectedTag}
           />
@@ -297,6 +307,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   contentScroll: {
     flex: 1,
