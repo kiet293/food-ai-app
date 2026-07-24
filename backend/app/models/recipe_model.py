@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, backref # type: ignore
 from app.models.database import Base
 
 class RecipeDB(Base):
@@ -71,10 +71,13 @@ class CommentDB(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     content = Column(Text, nullable=False)
     
+    parent_comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Lấy thông tin user đăng bình luận
     user = relationship("UserDB")
+    replies = relationship("CommentDB", backref=backref("parent", remote_side=[id]))
 
 
 class RatingDB(Base):

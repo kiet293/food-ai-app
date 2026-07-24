@@ -34,11 +34,21 @@ def add_comment(
                 status_code=status.HTTP_400_BAD_REQUEST
             )
             
+        if comment_data.parent_comment_id:
+            parent = db.query(CommentDB).filter(CommentDB.id == comment_data.parent_comment_id).first()
+            if not parent:
+                raise CustomException(
+                    message="Bình luận gốc không tồn tại",
+                    code="PARENT_COMMENT_NOT_FOUND",
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            
         # Tạo bình luận mới
         new_comment = CommentDB(
             recipe_id=recipe_id,
             user_id=current_user.id,
-            content=comment_data.content.strip()
+            content=comment_data.content.strip(),
+            parent_comment_id=comment_data.parent_comment_id
         )
         
         db.add(new_comment)
@@ -55,9 +65,10 @@ def add_comment(
                     "avatar": current_user.avatar
                 },
                 "content": new_comment.content,
-                "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None
+                "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None,
+                "parent_comment_id": new_comment.parent_comment_id
             },
-            message="Đã đăng bình luận thành công!"
+            message="Đăng bình luận thành công"
         )
         
     except CustomException:

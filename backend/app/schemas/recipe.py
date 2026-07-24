@@ -26,6 +26,7 @@ class RecipeSearchResponse(BaseModel):
 
 class CommentCreate(BaseModel):
     content: str
+    parent_comment_id: Optional[int] = None
 
 class RatingCreate(BaseModel):
     score: int = Field(..., ge=1, le=5, description="Điểm đánh giá từ 1 đến 5 sao")

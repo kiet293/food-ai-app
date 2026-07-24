@@ -222,7 +222,7 @@ export default function HomeScreen() {
             selectedTag={selectedTag}
             setSelectedTag={setSelectedTag}
           />
-          <ExploreGridSection gridImages={MOCK_EXPLORE_GRID} />
+          <ExploreGridSection />
 
           <View style={{ height: 100 }} />
         </ScrollView>

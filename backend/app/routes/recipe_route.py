@@ -60,6 +60,7 @@ def format_recipe_summary(recipe: RecipeDB):
         author_info = {
             "id": recipe.author.id,
             "name": recipe.author.full_name or recipe.author.username,
+            "handle": f"@{recipe.author.username}",
             "avatar": recipe.author.avatar
         }
     
@@ -76,6 +77,8 @@ def format_recipe_summary(recipe: RecipeDB):
         "ratings_avg": round(ratings_avg, 1),
         "ratings_count": len(ratings_list),
         "comments_count": len(recipe.comments) if recipe.comments else 0,
+        "save_count": 0, # Tạm thời trả về 0 theo kế hoạch
+        "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
 
@@ -271,6 +274,88 @@ def create_recipe(
         )
 
 
+# ====================================================================================================
+# API EXPLORE GRID (Sử dụng Cursor-based pagination bằng ID)
+# ====================================================================================================
+@router.get("/explore-grid")
+def get_explore_grid(
+    cursor: int = Query(None, description="ID của công thức cuối cùng ở lần tải trước"),
+    limit: int = Query(18, ge=1, le=50, description="Số lượng ảnh cần lấy"),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Sắp xếp mới nhất lên đầu (dựa vào ID giảm dần cho nhanh và chính xác)
+        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        
+        # Nếu có cursor, chỉ lấy các bài viết cũ hơn bài viết có ID = cursor
+        if cursor:
+            query = query.filter(RecipeDB.id < cursor)
+            
+        recipes = query.limit(limit).all()
+        
+        # Xác định next_cursor
+        next_cursor = recipes[-1].id if len(recipes) == limit else None
+        
+        # Format trả về chỉ cần id và image_url để hiển thị Grid cho nhẹ
+        result_list = [
+            {
+                "id": r.id,
+                "image": r.image_url or "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500"
+            }
+            for r in recipes
+        ]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy explore grid: {e}")
+        raise CustomException(
+            message="Lỗi khi lấy danh sách khám phá",
+            code="EXPLORE_GRID_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+# ====================================================================================================
+# API EXPLORE FEED (Sử dụng Cursor-based pagination bằng ID, trả về full chi tiết)
+# ====================================================================================================
+@router.get("/explore-feed")
+def get_explore_feed(
+    start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
+    limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
+    db: Session = Depends(get_db)
+):
+    try:
+        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        
+        # Lấy từ start_id trở xuống
+        if start_id:
+            query = query.filter(RecipeDB.id <= start_id)
+            
+        recipes = query.limit(limit).all()
+        
+        next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
+        
+        result_list = [format_recipe_summary(r) for r in recipes]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy explore feed: {e}")
+        raise CustomException(
+            message="Lỗi khi lấy danh sách feed",
+            code="EXPLORE_FEED_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 # API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
 @router.get("/{recipe_id}")
 def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
@@ -293,10 +378,12 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
         recipe_data["instructions"] = recipe.instructions
         recipe_data["servings"] = recipe.servings
         
-        # Bổ sung nội dung chi tiết bình luận (comments array)
-        comments_list = []
+        # Bổ sung nội dung chi tiết bình luận dạng cây (comments array)
+        comments_dict = {}
+        root_comments = []
         if recipe.comments:
-            for c in recipe.comments:
+            sorted_comments = sorted(recipe.comments, key=lambda x: x.id)
+            for c in sorted_comments:
                 user_info = None
                 if c.user:
                     user_info = {
@@ -304,13 +391,23 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
                         "name": c.user.full_name or c.user.username,
                         "avatar": c.user.avatar
                     }
-                comments_list.append({
+                comment_obj = {
                     "id": c.id,
                     "content": c.content,
                     "created_at": c.created_at.isoformat() if c.created_at else None,
-                    "user": user_info
-                })
-        recipe_data["comments"] = comments_list
+                    "user": user_info,
+                    "is_author": c.user_id == recipe.user_id,
+                    "replies": []
+                }
+                comments_dict[c.id] = comment_obj
+                
+            for c in sorted_comments:
+                if getattr(c, "parent_comment_id", None) and getattr(c, "parent_comment_id") in comments_dict:
+                    comments_dict[c.parent_comment_id]["replies"].append(comments_dict[c.id])
+                else:
+                    root_comments.append(comments_dict[c.id])
+                    
+        recipe_data["comments"] = root_comments
         
         return success_response(data=recipe_data, message="Lấy thông tin chi tiết công thức thành công")
         
