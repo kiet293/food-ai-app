@@ -62,7 +62,7 @@ export const fetchExploreGrid = async (cursor: number | null = null, limit: numb
     if (cursor !== null) {
       queryParams.append('cursor', cursor.toString());
     }
-    
+
     // Gọi API
     const API_BASE_URL = getApiBaseUrl();
 
@@ -120,7 +120,7 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
     if (startId !== null) {
       queryParams.append('start_id', startId.toString());
     }
-    
+
     // Gọi API
     const hostUri = Constants.expoConfig?.hostUri;
     const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
@@ -202,16 +202,44 @@ export const postRecipeComment = async (recipeId: number, content: string, paren
         parent_comment_id: parentCommentId || null
       })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to post comment');
     }
-    
+
     const json = await response.json();
     return json.data;
   } catch (error) {
     console.error("❌ Lỗi khi đăng bình luận:", error);
     return null;
+  }
+};
+
+export const postRecipeRating = async (recipeId: number, score: number, comment?: string): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const API_BASE_URL = getApiBaseUrl();
+
+    const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}/rate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        score,
+        comment: comment || null
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to post rating');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("❌ Lỗi khi đăng đánh giá:", error);
+    return false;
   }
 };
 

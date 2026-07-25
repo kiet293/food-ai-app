@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text  # type: ignore
+from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text, Boolean  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship, backref # type: ignore
 from app.models.database import Base
@@ -123,4 +123,38 @@ class RecipeTagDB(Base):
 
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class CollectionDB(Base):
+    __tablename__ = "collections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(150), nullable=False)
+    is_public = Column(Boolean, default=True) # use boolean or integer
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    recipes = relationship("CollectionRecipeDB", back_populates="collection", cascade="all, delete-orphan")
+
+class CollectionRecipeDB(Base):
+    __tablename__ = "collection_recipes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    collection_id = Column(Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    collection = relationship("CollectionDB", back_populates="recipes")
+    recipe = relationship("RecipeDB")
+
+class FavoriteDB(Base):
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    recipe = relationship("RecipeDB")
+    user = relationship("UserDB")

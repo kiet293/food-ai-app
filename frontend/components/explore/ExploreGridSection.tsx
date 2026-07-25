@@ -53,9 +53,8 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refr
     loadMore();
   }, []);
 
-  const renderItem = ({ item }: { item: ExploreGridItem }) => (
+  const renderItem = ({ item, index }: { item: ExploreGridItem, index: number }) => (
     <TouchableOpacity 
-      key={item.id} 
       style={styles.gridItem}
       onPress={() => router.push({ pathname: "/explore-detail/[id]", params: { id: item.id } })}
       activeOpacity={0.8}
@@ -72,7 +71,7 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refr
       <FlatList
         data={data}
         numColumns={3}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => `explore-${item.id}-${index}`}
         renderItem={renderItem}
         onEndReached={() => {
           if (data.length > 0) loadMore();

@@ -67,8 +67,49 @@ def update_profile(
 
     # Cập nhật avatar nếu có gửi lên
     if update_data.avatar is not None:
+        # Xóa ảnh cũ trên Cloudinary nếu đang có ảnh và avatar mới khác ảnh cũ
+        if current_user.avatar and current_user.avatar.startswith("http") and current_user.avatar != update_data.avatar:
+            try:
+                public_id = current_user.avatar.split("/")[-1].split(".")[0]
+                import cloudinary.uploader
+                cloudinary.uploader.destroy(public_id)
+            except Exception as e:
+                print("Lỗi xóa ảnh cũ:", e)
+                
         current_user.avatar = update_data.avatar  
         
     db.commit()
     db.refresh(current_user)
-    return {"message": "Cập nhật hồ sơ thành công!"}  
+    return {"message": "Cập nhật hồ sơ thành công!"}
+
+from fastapi import UploadFile, File
+import cloudinary.uploader
+
+@router.post("/me/avatar")
+def update_avatar_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Xóa ảnh cũ trên Cloudinary nếu nó là link ảnh
+        if current_user.avatar and current_user.avatar.startswith("http"):
+            try:
+                # Lấy public_id từ url (vd: .../image/upload/v123/public_id.jpg)
+                public_id = current_user.avatar.split("/")[-1].split(".")[0]
+                cloudinary.uploader.destroy(public_id)
+            except Exception as e:
+                print("Lỗi xóa ảnh cũ:", e)
+                
+        # Upload image to cloudinary
+        upload_result = cloudinary.uploader.upload(file.file)
+        image_url = upload_result.get("secure_url")
+        
+        # Update user avatar
+        current_user.avatar = image_url
+        db.commit()
+        db.refresh(current_user)
+        
+        return {"message": "Cập nhật ảnh đại diện thành công!", "avatar_url": image_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

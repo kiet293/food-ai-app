@@ -12,11 +12,15 @@ import {
   ScrollView,
   Platform,
   TextInput,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { fetchRecipeDetails, postRecipeComment, RecipeDetails, CommentInfo } from '@/services/exploreService';
+import { fetchRecipeDetails, postRecipeComment, postRecipeRating, RecipeDetails, CommentInfo } from '@/services/exploreService';
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -28,6 +32,11 @@ export default function RecipeDetailScreen() {
   const [commentText, setCommentText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: number; name: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
   const loadData = async () => {
     if (!id) return;
     const data = await fetchRecipeDetails(parseInt(id as string, 10));
@@ -37,7 +46,7 @@ export default function RecipeDetailScreen() {
 
   useEffect(() => {
     loadData();
-    
+
     // Polling every 5 seconds to get new comments
     const interval = setInterval(() => {
       if (id) {
@@ -46,7 +55,7 @@ export default function RecipeDetailScreen() {
         });
       }
     }, 5000);
-    
+
     return () => clearInterval(interval);
   }, [id]);
 
@@ -56,7 +65,7 @@ export default function RecipeDetailScreen() {
 
     const recipeId = parseInt(id as string, 10);
     const parentId = replyTo ? replyTo.id : undefined;
-    
+
     // Optimistic UI Update (Cập nhật tạm thời lên màn hình)
     const tempComment: CommentInfo = {
       id: Math.random(), // ID tạm
@@ -70,7 +79,7 @@ export default function RecipeDetailScreen() {
     setRecipe(prev => {
       if (!prev) return prev;
       const newComments = [...(prev.comments || [])];
-      
+
       if (parentId) {
         // Tìm comment cha để nhét vào (Chỉ hỗ trợ đệ quy 1 tầng tìm kiếm tạm thời)
         const addReply = (comments: CommentInfo[]) => {
@@ -87,7 +96,7 @@ export default function RecipeDetailScreen() {
       } else {
         newComments.push(tempComment);
       }
-      
+
       return { ...prev, comments: newComments };
     });
 
@@ -96,10 +105,28 @@ export default function RecipeDetailScreen() {
 
     // Gửi API thật
     await postRecipeComment(recipeId, tempComment.content, parentId);
-    
+
     // Sau khi POST xong thì load lại data chuẩn từ server
     await loadData();
     setIsPosting(false);
+  };
+
+  const handleSubmitRating = async () => {
+    if (selectedRating === 0 || !id) return;
+    setIsSubmittingRating(true);
+    
+    const recipeId = parseInt(id as string, 10);
+    const success = await postRecipeRating(recipeId, selectedRating, ratingComment);
+    
+    setIsSubmittingRating(false);
+    setIsRatingModalVisible(false);
+    
+    if (success) {
+      Alert.alert("Thành công", "Cảm ơn bạn đã gửi đánh giá công thức!");
+      loadData(); // Tải lại để cập nhật điểm
+    } else {
+      Alert.alert("Lỗi", "Không thể gửi đánh giá lúc này, vui lòng thử lại sau.");
+    }
   };
 
   const renderComment = (comment: CommentInfo, depth: number = 0, isLast: boolean = true) => {
@@ -118,7 +145,7 @@ export default function RecipeDetailScreen() {
                 borderColor: '#ddd'
               }} />
             )}
-            
+
             {/* Đường cong (chữ L) chĩa vào avatar */}
             <View style={{
               position: 'absolute',
@@ -152,8 +179,8 @@ export default function RecipeDetailScreen() {
               )}
             </View>
             <Text style={styles.commentText}>{comment.content}</Text>
-            <TouchableOpacity 
-              style={{ marginTop: 4 }} 
+            <TouchableOpacity
+              style={{ marginTop: 4 }}
               onPress={() => setReplyTo({ id: comment.id, name: comment.user?.name || 'User' })}
             >
               <Text style={styles.replyBtnText}>Trả lời</Text>
@@ -162,7 +189,7 @@ export default function RecipeDetailScreen() {
         </View>
         {comment.replies && comment.replies.length > 0 && (
           <View style={{ marginTop: 8, marginLeft: 42 }}>
-            {comment.replies.map((reply, index) => 
+            {comment.replies.map((reply, index) =>
               renderComment(reply, depth + 1, index === comment.replies!.length - 1)
             )}
           </View>
@@ -186,8 +213,8 @@ export default function RecipeDetailScreen() {
     instructionsList = typeof recipe.instructions === 'string' ? JSON.parse(recipe.instructions) : (recipe.instructions || []);
   } catch (e) { }
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -223,18 +250,21 @@ export default function RecipeDetailScreen() {
         {/* ACTION BAR */}
         <View style={styles.actionBar}>
           <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="bookmark" size={22} color="#f04d4f" />
-            <Text style={styles.actionText}>{recipe.save_count || 0}</Text>
+            <Ionicons name="bookmark" size={20} color="#222" />
+            <Text style={[styles.actionText, { color: '#222' }]}>{recipe.save_count || 0} Save</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.actionBtn} onPress={() => { setSelectedRating(0); setRatingComment(''); setIsRatingModalVisible(true); }}>
+            <Ionicons name="star" size={22} color="#F4B400" />
+            <Text style={[styles.actionText, { color: '#222', fontWeight: 'bold' }]}>
+              {recipe.ratings_avg ? recipe.ratings_avg.toFixed(1) : "5.0"} 
+              <Text style={{ fontWeight: 'normal', color: '#555' }}> ({recipe.ratings_count || 0} Đánh giá)</Text>
+            </Text>
           </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="star" size={22} color="#555" />
-            <Text style={styles.actionText}>Đánh giá</Text>
-          </TouchableOpacity>
-          <View style={styles.divider} />
-          <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="send" size={22} color="#555" />
-            <Text style={styles.actionText}>Chia sẻ</Text>
+            <Ionicons name="paper-plane-outline" size={22} color="#222" />
+            <Text style={[styles.actionText, { color: '#222' }]}>Chia sẻ</Text>
           </TouchableOpacity>
         </View>
         {/* AUTHOR SECTION */}
@@ -285,7 +315,7 @@ export default function RecipeDetailScreen() {
                 {ingredientsList.length > 0 ? ingredientsList.map((ing, idx) => {
                   let parsedIng = ing;
                   if (typeof ing === 'string') {
-                    try { parsedIng = JSON.parse(ing); } catch (e) {}
+                    try { parsedIng = JSON.parse(ing); } catch (e) { }
                   }
                   const text = typeof parsedIng === 'string' ? parsedIng : (parsedIng.name || parsedIng.description || JSON.stringify(parsedIng));
                   return (
@@ -304,7 +334,7 @@ export default function RecipeDetailScreen() {
                 {instructionsList.length > 0 ? instructionsList.map((step, idx) => {
                   let parsedStep = step;
                   if (typeof step === 'string') {
-                    try { parsedStep = JSON.parse(step); } catch (e) {}
+                    try { parsedStep = JSON.parse(step); } catch (e) { }
                   }
                   const text = typeof parsedStep === 'string' ? parsedStep : (parsedStep.description || parsedStep.text || JSON.stringify(parsedStep));
                   return (
@@ -337,6 +367,65 @@ export default function RecipeDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* RATING MODAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isRatingModalVisible}
+        onRequestClose={() => setIsRatingModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Đánh giá công thức</Text>
+              <Text style={styles.modalSubtitle}>Bạn cảm thấy món ăn này thế nào?</Text>
+
+              <View style={styles.starsSelectionRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => setSelectedRating(star)} activeOpacity={0.7} style={styles.starBtn}>
+                    <Ionicons
+                      name={selectedRating >= star ? "star" : "star-outline"}
+                      size={40}
+                      color={selectedRating >= star ? "#FFD700" : "#ccc"}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.ratingTextInput}
+                placeholder="Chia sẻ thêm cảm nhận của bạn (Không bắt buộc)..."
+                value={ratingComment}
+                onChangeText={setRatingComment}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.modalCancelBtn]}
+                  onPress={() => setIsRatingModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.modalSubmitBtn, selectedRating === 0 && { opacity: 0.5 }]}
+                  disabled={selectedRating === 0 || isSubmittingRating}
+                  onPress={handleSubmitRating}
+                >
+                  {isSubmittingRating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Gửi đánh giá</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* FOOTER INPUT FOR COMMENTS */}
       {activeTab === 'comments' && (
         <View style={styles.commentInputWrapper}>
           {replyTo && (
@@ -356,7 +445,7 @@ export default function RecipeDetailScreen() {
               onChangeText={setCommentText}
               multiline
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.postCommentBtn, (!commentText.trim() || isPosting) && { opacity: 0.5 }]}
               disabled={!commentText.trim() || isPosting}
               onPress={handlePostComment}
@@ -725,6 +814,84 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     alignItems: 'flex-end',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  starsSelectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  starBtn: {
+    paddingHorizontal: 4,
+  },
+  ratingTextInput: {
+    width: '100%',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 16,
+    height: 100,
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalActionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    backgroundColor: '#f0f0f0',
+    marginRight: 10,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#ff5a5f',
+    marginLeft: 10,
+  },
+  modalSubmitText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   commentInput: {
     flex: 1,

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, RecipeStatsDB, RatingDB, CommentDB, CategoryDB, RecipeCategoryDB, TagDB, RecipeTagDB
-from app.schemas.recipe import AIAnalysisResult # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
+from app.schemas.recipe import AIAnalysisResult, RateRecipeRequest # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
 from app.models.user_model import UserDB
 from app.utils.deps import get_current_user
 from app.crud.recipe_stats import record_recipe_save
@@ -674,4 +674,56 @@ def update_recipe(
             message="Lỗi hệ thống khi cập nhật công thức",
             code="UPDATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@router.post("/{recipe_id}/rate")
+def rate_recipe(
+    recipe_id: int, 
+    request: RateRecipeRequest, 
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # 1. Kiểm tra công thức có tồn tại không
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=404
+            )
+            
+        # 2. Xử lý logic đánh giá
+        existing_rating = db.query(RatingDB).filter(
+            RatingDB.recipe_id == recipe_id, 
+            RatingDB.user_id == current_user.id
+        ).first()
+        
+        if existing_rating:
+            existing_rating.score = request.score
+        else:
+            new_rating = RatingDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                score=request.score
+            )
+            db.add(new_rating)
+            
+        # 3. Xử lý logic comment nếu có nhập chữ
+        if request.comment and request.comment.strip():
+            new_comment = CommentDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                content=request.comment.strip()
+            )
+            db.add(new_comment)
+            
+        db.commit()
+        return success_response(message="Đánh giá công thức thành công!")
+    except Exception as e:
+        db.rollback()
+        raise CustomException(
+            message=f"Lỗi khi lưu đánh giá: {e}",
+            code="RATE_RECIPE_ERROR",
+            status_code=500
         )
