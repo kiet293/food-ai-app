@@ -214,3 +214,33 @@ export const postRecipeComment = async (recipeId: number, content: string, paren
     return null;
   }
 };
+
+export interface ChefInfo {
+  id: string;
+  name: string;
+  avatar: string;
+  isFollowing: boolean;
+  follower_count: number;
+}
+
+export const fetchPopularChefs = async (): Promise<ChefInfo[]> => {
+  try {
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/users/popular-chefs`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Server popular-chefs đang lỗi');
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error("❌ Lỗi lấy danh sách popular chefs:", error);
+    return [];
+  }
+};

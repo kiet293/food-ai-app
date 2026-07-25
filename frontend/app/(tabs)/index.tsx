@@ -6,15 +6,14 @@ import { getUserProfile } from '@/services/authService';
 import useRecentSearches from '@/hooks/useRecentSearches';
 import {
   MOCK_COLLECTIONS,
-  MOCK_CHEFS,
   MOCK_TRENDING_RECIPES,
   MOCK_HOT_TAGS,
   MOCK_EXPLORE_GRID,
   MOCK_POSTS,
   PostItem,
-  ChefItem,
   TrendingRecipeItem,
 } from '@/services/mockCommunityData';
+import { fetchPopularChefs, ChefInfo } from '@/services/exploreService';
 import { fetchHotTags, TagInfo } from '@/services/tagService';
 
 // Modular Refactored Components
@@ -91,7 +90,7 @@ export default function HomeScreen() {
   const { items: recentItems, remove: removeRecent } = useRecentSearches();
 
   const [posts, setPosts] = useState<PostItem[]>(MOCK_POSTS);
-  const [chefs, setChefs] = useState<ChefItem[]>(MOCK_CHEFS);
+  const [chefs, setChefs] = useState<ChefInfo[]>([]);
   const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>(MOCK_TRENDING_RECIPES);
   const [hotTags, setHotTags] = useState<TagInfo[]>([]);
 
@@ -100,7 +99,12 @@ export default function HomeScreen() {
       const tags = await fetchHotTags();
       if (tags) setHotTags(tags);
     };
+    const loadChefs = async () => {
+      const popularChefs = await fetchPopularChefs();
+      if (popularChefs.length > 0) setChefs(popularChefs);
+    };
     loadTags();
+    loadChefs();
   }, []);
 
   // Modals state
