@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, backref # type: ignore
 from app.models.database import Base
 
 class RecipeDB(Base):
@@ -71,10 +71,13 @@ class CommentDB(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     content = Column(Text, nullable=False)
     
+    parent_comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Lấy thông tin user đăng bình luận
     user = relationship("UserDB")
+    replies = relationship("CommentDB", backref=backref("parent", remote_side=[id]))
 
 
 class RatingDB(Base):
@@ -86,5 +89,38 @@ class RatingDB(Base):
     score = Column(Integer, nullable=False) # VD: từ 1 đến 5 sao
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    user = relationship("UserDB")
+    user = relationship("UserDB")
+
+class CategoryDB(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    slug = Column(String(120), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class RecipeCategoryDB(Base):
+    __tablename__ = "recipe_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class TagDB(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)
+    slug = Column(String(60), unique=True, nullable=False)
+    usage_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class RecipeTagDB(Base):
+    __tablename__ = "recipe_tags"
+
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

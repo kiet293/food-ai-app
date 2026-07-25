@@ -17,33 +17,34 @@ import {
   StatusBar,
   Image,
   ScrollView,
+  Switch,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getUserProfile, logoutUser, updateUserProfile } from '../../services/authService';
 import { getSavedRecipes } from '../../services/aiService';
 import { useAuth } from '../_layout';
 
-// Danh sách Emoji để người dùng lựa chọn làm ảnh đại diện
 const EMOJI_LIST = ['👨‍🍳', '👩‍🍳', '🥷', '🐱', '🐻', '🦊', '🦁', '🥑', '🍕', '🍣', '☕', '🔥'];
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
 
-  // State lưu thông tin từ Server trả về
   const [userInfo, setUserInfo] = useState<{ username: string; joined_at: string; full_name: string; avatar: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [savedCount, setSavedCount] = useState(0);
 
-  // State phục vụ cho chức năng Chỉnh sửa (Modal)
+  // Dark Mode Toggle State (Option 4)
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Modal State
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState('👨‍🍳');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Hàm tải dữ liệu hồ sơ cá nhân
   const loadProfile = async () => {
     setIsLoading(true);
     const data = await getUserProfile();
@@ -53,7 +54,6 @@ export default function ProfileScreen() {
       setSelectedAvatar(data.avatar);
     }
     
-    // Tải số lượng công thức đã lưu trong sổ tay
     try {
       const recipes = await getSavedRecipes();
       setSavedCount(recipes.length || 0);
@@ -63,14 +63,12 @@ export default function ProfileScreen() {
     setIsLoading(false);
   };
 
-  // Tự động tải lại thông tin mỗi khi tab Profile được hiển thị
   useFocusEffect(
     useCallback(() => {
       loadProfile();
     }, [])
   );
 
-  // Xử lý gửi thông tin cập nhật lên Backend
   const handleSaveProfile = async () => {
     if (!editFullName.trim()) {
       Alert.alert("Lỗi", "Tên hiển thị không được để trống!");
@@ -109,29 +107,34 @@ export default function ProfileScreen() {
     );
   };
 
+  const dynamicBg = isDarkMode ? '#121212' : '#f8f9fa';
+  const dynamicCardBg = isDarkMode ? '#1e1e1e' : '#fff';
+  const dynamicTextColor = isDarkMode ? '#fff' : '#111';
+  const dynamicSubTextColor = isDarkMode ? '#aaa' : '#777';
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f6f3ea" />
+    <SafeAreaView style={[styles.container, { backgroundColor: dynamicBg }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={dynamicBg} />
 
       {isLoading && !userInfo ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2ecc71" />
-          <Text style={styles.loadingText}>Đang tải thông tin cá nhân...</Text>
+          <ActivityIndicator size="large" color="#28a745" />
+          <Text style={[styles.loadingText, { color: dynamicSubTextColor }]}>Đang tải thông tin cá nhân...</Text>
         </View>
       ) : userInfo ? (
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Header Banner */}
           <View style={styles.bannerContainer}>
             <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800' }}
+              source={{ uri: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&auto=format&fit=crop&q=80' }}
               style={styles.bannerImage}
               resizeMode="cover"
             />
             <View style={styles.bannerOverlay} />
           </View>
 
-          {/* User Profile Info Card */}
-          <View style={styles.profileHeaderCard}>
+          {/* User Profile Card */}
+          <View style={[styles.profileHeaderCard, { backgroundColor: dynamicCardBg }]}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarBorder}>
                 <View style={styles.avatarContainer}>
@@ -140,38 +143,40 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Text style={styles.fullNameText}>{userInfo.full_name}</Text>
+            <Text style={[styles.fullNameText, { color: dynamicTextColor }]}>{userInfo.full_name}</Text>
             <Text style={styles.usernameText}>@{userInfo.username}</Text>
             <Text style={styles.joinedText}>📅 Tham gia: {userInfo.joined_at}</Text>
 
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
+            {/* Stats Row Pepper Style */}
+            <View style={[styles.statsRow, { backgroundColor: isDarkMode ? '#2a2a2a' : '#f8fdf9' }]}>
               <View style={styles.statColumn}>
-                <Text style={styles.statNumber}>{savedCount}</Text>
+                <Text style={[styles.statNumber, { color: dynamicTextColor }]}>{savedCount}</Text>
                 <Text style={styles.statLabel}>Đã lưu</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statColumn}>
-                <Text style={styles.statNumber}>
+                <Text style={[styles.statNumber, { color: dynamicTextColor }]}>
                   {savedCount >= 8 ? 'Master' : savedCount >= 4 ? 'Pro Cook' : 'Tập sự'}
                 </Text>
                 <Text style={styles.statLabel}>Cấp độ</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statColumn}>
-                <Text style={styles.statNumber}>🏆 {savedCount >= 8 ? '3' : savedCount >= 4 ? '2' : savedCount > 0 ? '1' : '0'}</Text>
+                <Text style={[styles.statNumber, { color: dynamicTextColor }]}>
+                  🏆 {savedCount >= 8 ? '3' : savedCount >= 4 ? '2' : savedCount > 0 ? '1' : '0'}
+                </Text>
                 <Text style={styles.statLabel}>Danh hiệu</Text>
               </View>
             </View>
 
-            {/* Action Buttons inside Card */}
+            {/* Action Buttons */}
             <View style={styles.actionRow}>
               <TouchableOpacity
                 style={styles.editButton}
                 onPress={() => setIsEditModalVisible(true)}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="edit" size={18} color="#2ecc71" style={styles.buttonIcon} />
+                <Ionicons name="create-outline" size={18} color="#28a745" style={{ marginRight: 6 }} />
                 <Text style={styles.editButtonText}>Chỉnh sửa</Text>
               </TouchableOpacity>
               
@@ -180,15 +185,15 @@ export default function ProfileScreen() {
                 onPress={handleLogout}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="logout" size={18} color="#fff" style={styles.buttonIcon} />
+                <Ionicons name="log-out-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
                 <Text style={styles.logoutButtonText}>Đăng xuất</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Section: Danh hiệu đạt được */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏅 Huy hiệu của tôi</Text>
+          {/* Section: Huy hiệu của tôi */}
+          <View style={[styles.section, { backgroundColor: dynamicCardBg }]}>
+            <Text style={[styles.sectionTitle, { color: dynamicTextColor }]}>🏅 Huy hiệu đạt được</Text>
             <View style={styles.badgeRow}>
               <View style={[styles.badgeCard, savedCount > 0 ? styles.badgeActive : styles.badgeInactive]}>
                 <Text style={styles.badgeEmoji}>🍳</Text>
@@ -210,40 +215,49 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Section: Cài đặt & Hỗ trợ */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⚙️ Cài đặt & Tiện ích</Text>
+          {/* Section: Cài đặt & Dark Mode Toggle */}
+          <View style={[styles.section, { backgroundColor: dynamicCardBg }]}>
+            <Text style={[styles.sectionTitle, { color: dynamicTextColor }]}>⚙️ Cài đặt & Trải nghiệm</Text>
             
-            <TouchableOpacity style={styles.settingItem} activeOpacity={0.7}>
-              <View style={styles.settingIconCircle}>
-                <MaterialIcons name="notifications-none" size={20} color="#1a3a1a" />
+            {/* Dark Mode Switch (Option 4) */}
+            <View style={styles.settingItem}>
+              <View style={[styles.settingIconCircle, { backgroundColor: isDarkMode ? '#333' : '#e8f5e9' }]}>
+                <Ionicons name={isDarkMode ? "moon" : "sunny"} size={20} color="#28a745" />
               </View>
-              <Text style={styles.settingText}>Thông báo ứng dụng</Text>
-              <MaterialIcons name="chevron-right" size={24} color="#adc6ad" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingText, { color: dynamicTextColor }]}>Giao diện Tối (Dark Mode)</Text>
+                <Text style={{ fontSize: 11, color: dynamicSubTextColor }}>{isDarkMode ? 'Đang bật Chế độ tối' : 'Đang bật Chế độ sáng'}</Text>
+              </View>
+              <Switch
+                value={isDarkMode}
+                onValueChange={setIsDarkMode}
+                trackColor={{ false: '#ddd', true: '#28a745' }}
+                thumbColor="#fff"
+              />
+            </View>
+
+            <TouchableOpacity style={styles.settingItem} activeOpacity={0.7}>
+              <View style={[styles.settingIconCircle, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="notifications-outline" size={20} color="#28a745" />
+              </View>
+              <Text style={[styles.settingText, { color: dynamicTextColor }]}>Thông báo ứng dụng</Text>
+              <Ionicons name="chevron-forward" size={20} color="#bbb" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.settingItem} activeOpacity={0.7}>
-              <View style={styles.settingIconCircle}>
-                <MaterialIcons name="security" size={20} color="#1a3a1a" />
+              <View style={[styles.settingIconCircle, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#28a745" />
               </View>
-              <Text style={styles.settingText}>Quyền riêng tư & Bảo mật</Text>
-              <MaterialIcons name="chevron-right" size={24} color="#adc6ad" />
+              <Text style={[styles.settingText, { color: dynamicTextColor }]}>Quyền riêng tư & Bảo mật</Text>
+              <Ionicons name="chevron-forward" size={20} color="#bbb" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.settingItem} activeOpacity={0.7}>
-              <View style={styles.settingIconCircle}>
-                <MaterialIcons name="color-lens" size={20} color="#1a3a1a" />
+              <View style={[styles.settingIconCircle, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="help-circle-outline" size={20} color="#28a745" />
               </View>
-              <Text style={styles.settingText}>Giao diện (Sáng/Tối)</Text>
-              <MaterialIcons name="chevron-right" size={24} color="#adc6ad" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.settingItem} activeOpacity={0.7}>
-              <View style={styles.settingIconCircle}>
-                <MaterialIcons name="help-outline" size={20} color="#1a3a1a" />
-              </View>
-              <Text style={styles.settingText}>Liên hệ hỗ trợ & Trợ giúp</Text>
-              <MaterialIcons name="chevron-right" size={24} color="#adc6ad" />
+              <Text style={[styles.settingText, { color: dynamicTextColor }]}>Liên hệ hỗ trợ & Trợ giúp</Text>
+              <Ionicons name="chevron-forward" size={20} color="#bbb" />
             </TouchableOpacity>
           </View>
 
@@ -255,7 +269,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* ==================== MODAL CHỈNH SỬA HỒ SƠ ==================== */}
+      {/* Edit Profile Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -271,7 +285,6 @@ export default function ProfileScreen() {
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Chỉnh sửa hồ sơ 📝</Text>
 
-                {/* Mục chọn Avatar */}
                 <Text style={styles.inputLabel}>Chọn ảnh đại diện mới:</Text>
                 <View style={styles.emojiListContainer}>
                   <FlatList
@@ -293,7 +306,6 @@ export default function ProfileScreen() {
                   />
                 </View>
 
-                {/* Mục nhập Tên hiển thị */}
                 <Text style={styles.inputLabel}>Tên hiển thị của bạn:</Text>
                 <TextInput
                   style={styles.input}
@@ -302,7 +314,6 @@ export default function ProfileScreen() {
                   placeholder="Nhập tên hiển thị mới..."
                 />
 
-                {/* Các nút lệnh */}
                 <View style={styles.modalActionRow}>
                   <TouchableOpacity
                     style={[styles.modalButton, styles.cancelButton]}
@@ -336,7 +347,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
@@ -349,13 +360,12 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#8aab8a',
     fontSize: 15,
   },
   bannerContainer: {
     height: 140,
     position: 'relative',
-    backgroundColor: '#dde8dd',
+    backgroundColor: '#28a745',
   },
   bannerImage: {
     width: '100%',
@@ -363,18 +373,18 @@ const styles = StyleSheet.create({
   },
   bannerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(26, 58, 26, 0.15)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   profileHeaderCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 18,
     marginHorizontal: 16,
     marginTop: -50,
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 16,
     alignItems: 'center',
-    shadowColor: '#1a3a1a',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 10,
@@ -402,12 +412,12 @@ const styles = StyleSheet.create({
   avatarContainer: {
     width: 82,
     height: 82,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: '#e8f5e9',
     borderRadius: 41,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e8f0e8',
+    borderColor: '#28a745',
   },
   avatarText: {
     fontSize: 42,
@@ -415,30 +425,30 @@ const styles = StyleSheet.create({
   fullNameText: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
     marginBottom: 4,
   },
   usernameText: {
     fontSize: 14,
-    color: '#8aab8a',
-    fontWeight: '500',
+    color: '#28a745',
+    fontWeight: '600',
     marginBottom: 8,
   },
   joinedText: {
     fontSize: 12,
-    color: '#adc6ad',
+    color: '#888',
     marginBottom: 16,
   },
   statsRow: {
     flexDirection: 'row',
     width: '100%',
-    backgroundColor: '#f7fbf7',
-    borderRadius: 12,
+    backgroundColor: '#f8fdf9',
+    borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e8f0e8',
+    borderColor: '#e8f5e9',
   },
   statColumn: {
     flex: 1,
@@ -447,18 +457,18 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
   },
   statLabel: {
     fontSize: 11,
-    color: '#8aab8a',
+    color: '#777',
     marginTop: 2,
     fontWeight: '500',
   },
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#dde8dd',
+    backgroundColor: '#ddd',
   },
   actionRow: {
     flexDirection: 'row',
@@ -469,7 +479,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     borderWidth: 1.5,
-    borderColor: '#2ecc71',
+    borderColor: '#28a745',
     paddingVertical: 12,
     borderRadius: 24,
     alignItems: 'center',
@@ -477,7 +487,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   editButtonText: {
-    color: '#2ecc71',
+    color: '#28a745',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -495,25 +505,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  buttonIcon: {
-    marginRight: 6,
-  },
   section: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#1a3a1a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
     marginBottom: 14,
   },
   badgeRow: {
@@ -522,18 +529,18 @@ const styles = StyleSheet.create({
   },
   badgeCard: {
     flex: 1,
-    backgroundColor: '#f7fbf7',
+    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     padding: 10,
     alignItems: 'center',
     borderWidth: 1.5,
   },
   badgeActive: {
-    borderColor: '#2ecc71',
-    backgroundColor: '#f1fcf6',
+    borderColor: '#28a745',
+    backgroundColor: '#f8fdf9',
   },
   badgeInactive: {
-    borderColor: '#e8f0e8',
+    borderColor: '#eee',
     opacity: 0.5,
   },
   badgeEmoji: {
@@ -543,12 +550,12 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
     textAlign: 'center',
   },
   badgeDesc: {
     fontSize: 9,
-    color: '#8aab8a',
+    color: '#888',
     textAlign: 'center',
     marginTop: 2,
     lineHeight: 11,
@@ -558,13 +565,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f4f0',
+    borderBottomColor: '#f0f0f0',
   },
   settingIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f0f4f0',
+    backgroundColor: '#e8f5e9',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -572,7 +579,7 @@ const styles = StyleSheet.create({
   settingText: {
     flex: 1,
     fontSize: 14,
-    color: '#1a3a1a',
+    color: '#111',
     fontWeight: '600',
   },
   errorText: {
@@ -580,7 +587,6 @@ const styles = StyleSheet.create({
     color: '#ff4757',
     fontSize: 15,
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
@@ -593,34 +599,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
     paddingTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1a3a1a',
+    color: '#111',
     marginBottom: 20,
     textAlign: 'center',
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1a3a1a',
+    color: '#333',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f0f4f0',
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#dde8dd',
+    borderColor: '#eee',
     borderRadius: 12,
     padding: 14,
     fontSize: 15,
     marginBottom: 20,
-    color: '#1a3a1a',
+    color: '#111',
   },
   emojiListContainer: {
     marginBottom: 20,
@@ -636,9 +637,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   selectedEmojiItem: {
-    backgroundColor: '#f1fcf6',
+    backgroundColor: '#e8f5e9',
     borderWidth: 2,
-    borderColor: '#2ecc71',
+    borderColor: '#28a745',
   },
   emojiText: {
     fontSize: 24,
@@ -658,12 +659,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f4f0',
   },
   cancelButtonText: {
-    color: '#1a3a1a',
+    color: '#333',
     fontSize: 15,
     fontWeight: '700',
   },
   saveButton: {
-    backgroundColor: '#2ecc71',
+    backgroundColor: '#28a745',
   },
   saveButtonText: {
     color: '#fff',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import AuthScreen from '../components/AuthScreen';
+import AuthScreen from '../components/auth/AuthScreen';
 
 import { useAuth } from './_layout';
 

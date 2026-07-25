@@ -18,17 +18,16 @@ import {
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { searchRecipes, saveRecipeToDatabase, AIAnalysisResult } from "../services/aiService";
+import { searchCommunityRecipes, RecipeSummary } from "../services/searchService";
 
 export default function SearchPage() {
   const router = useRouter();
   const { q } = useLocalSearchParams<{ q?: string }>();
 
   const [searchText, setSearchText] = useState("");
-  const [recipes, setRecipes] = useState<AIAnalysisResult[]>([]);
+  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<AIAnalysisResult | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeSummary | null>(null);
 
   // Tự động tìm kiếm nếu có param q truyền sang
   useEffect(() => {
@@ -47,16 +46,11 @@ export default function SearchPage() {
 
     setIsLoading(true);
     try {
-      // Tách nguyên liệu bởi dấu phẩy hoặc khoảng trắng
-      const ingredients = query
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const response = await searchRecipes(ingredients);
-      setRecipes(response?.recipes || []);
-      if (!response?.recipes || response.recipes.length === 0) {
-        Alert.alert("Thông báo", "Không tìm thấy món ăn nào phù hợp. Bạn hãy thử thay đổi danh sách nguyên liệu xem nhé!");
+      // Gọi API tìm kiếm cộng đồng
+      const response = await searchCommunityRecipes(query);
+      setRecipes(response?.items || []);
+      if (!response?.items || response.items.length === 0) {
+        Alert.alert("Thông báo", "Không tìm thấy công thức nào phù hợp. Bạn hãy thử từ khóa khác nhé!");
       }
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
@@ -66,38 +60,26 @@ export default function SearchPage() {
     }
   };
 
-  const handleSaveRecipe = async (recipe: AIAnalysisResult) => {
-    setIsSaving(true);
-    try {
-      await saveRecipeToDatabase(recipe);
-      Alert.alert("Thành công! 🎉", `Đã thêm "${recipe.recipeName}" vào Sổ tay của bạn.`);
-    } catch (error: any) {
-      Alert.alert("Thông báo", error.message || "Không thể lưu lúc này. Vui lòng thử lại sau.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const renderRecipeItem = ({ item }: { item: AIAnalysisResult }) => (
+  const renderRecipeItem = ({ item }: { item: RecipeSummary }) => (
     <TouchableOpacity
       style={styles.recipeCard}
       onPress={() => setSelectedRecipe(item)}
       activeOpacity={0.8}
     >
       <Image
-        source={{ uri: item.imageUrl || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500" }}
+        source={{ uri: item.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500" }}
         style={styles.recipeImage}
         resizeMode="cover"
       />
       <View style={styles.recipeDetails}>
         <Text style={styles.recipeName} numberOfLines={2}>
-          {item.recipeName}
+          {item.title}
         </Text>
         <Text style={styles.recipeSnippet} numberOfLines={2}>
-          {item.instructions && item.instructions[0] ? item.instructions[0] : "Chưa có hướng dẫn nấu cụ thể."}
+          {item.author?.name ? `Tác giả: ${item.author.name}` : "Tác giả: Ẩn danh"}
         </Text>
         <Text style={styles.ingredientsSummary} numberOfLines={1}>
-          🛒 {item.ingredients.map((ing) => ing.name).join(" · ")}
+          ⭐ {item.ratings_avg} ({item.ratings_count}) · 💬 {item.comments_count}
         </Text>
       </View>
       <View style={styles.arrowIconContainer}>
@@ -151,7 +133,7 @@ export default function SearchPage() {
         {isLoading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#2ecc71" />
-            <Text style={styles.loadingText}>Gemini đang vắt óc suy nghĩ món ăn...</Text>
+            <Text style={styles.loadingText}>Đang tìm kiếm công thức...</Text>
           </View>
         ) : recipes.length > 0 ? (
           <FlatList
@@ -165,7 +147,7 @@ export default function SearchPage() {
           <View style={styles.centerContainer}>
             <Text style={styles.emptyEmoji}>🥬🍳🥕</Text>
             <Text style={styles.emptyText}>
-              Nhập các nguyên liệu bạn có vào ô tìm kiếm ở trên để AI gợi ý các công thức nấu ăn phù hợp nhé!
+              Nhập từ khóa tìm kiếm để khám phá các công thức nấu ăn hấp dẫn từ cộng đồng nhé!
             </Text>
           </View>
         )}
@@ -187,39 +169,39 @@ export default function SearchPage() {
 
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle} numberOfLines={2}>
-                    {selectedRecipe.recipeName}
+                    {selectedRecipe.title}
                   </Text>
                 </View>
 
                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                  {selectedRecipe.imageUrl && (
+                  {selectedRecipe.image && (
                     <Image
-                      source={{ uri: selectedRecipe.imageUrl }}
+                      source={{ uri: selectedRecipe.image }}
                       style={styles.recipeHeroImage}
                       resizeMode="cover"
                     />
                   )}
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>🛒 Nguyên liệu cần thiết</Text>
-                    {selectedRecipe.ingredients.map((item, index) => (
-                      <View key={index} style={styles.ingredientRow}>
-                        <View style={styles.ingredientDot} />
-                        <Text style={styles.ingredientText}>{item.name}</Text>
-                      </View>
-                    ))}
+                    <Text style={styles.sectionTitle}>Thông tin chung</Text>
+                    <View style={styles.ingredientRow}>
+                      <View style={styles.ingredientDot} />
+                      <Text style={styles.ingredientText}>Thời gian: {selectedRecipe.cook_time_minutes || "--"} phút</Text>
+                    </View>
+                    <View style={styles.ingredientRow}>
+                      <View style={styles.ingredientDot} />
+                      <Text style={styles.ingredientText}>Độ khó: {selectedRecipe.difficulty || "--"}</Text>
+                    </View>
                   </View>
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>🍳 Hướng dẫn thực hiện</Text>
-                    {selectedRecipe.instructions.map((step, index) => (
-                      <View key={index} style={styles.stepRow}>
-                        <View style={styles.stepNumber}>
-                          <Text style={styles.stepNumberText}>{index + 1}</Text>
-                        </View>
-                        <Text style={styles.stepText}>{step}</Text>
-                      </View>
-                    ))}
+                    <Text style={styles.sectionTitle}>Cộng đồng</Text>
+                    <View style={styles.ingredientRow}>
+                      <Text style={styles.ingredientText}>Đánh giá: ⭐ {selectedRecipe.ratings_avg} ({selectedRecipe.ratings_count})</Text>
+                    </View>
+                    <View style={styles.ingredientRow}>
+                      <Text style={styles.ingredientText}>Bình luận: 💬 {selectedRecipe.comments_count}</Text>
+                    </View>
                   </View>
                   <View style={{ height: 20 }} />
                 </ScrollView>
@@ -228,15 +210,12 @@ export default function SearchPage() {
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.saveButton]}
-                    onPress={() => handleSaveRecipe(selectedRecipe)}
-                    disabled={isSaving}
+                    onPress={() => {
+                      Alert.alert("Chức năng đang phát triển", "Đang chờ điều hướng đến trang chi tiết...");
+                    }}
                     activeOpacity={0.8}
                   >
-                    {isSaving ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>❤️ Lưu vào sổ tay của tôi</Text>
-                    )}
+                    <Text style={styles.saveButtonText}>Xem chi tiết</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity

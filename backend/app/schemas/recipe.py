@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 # 1. Định nghĩa cấu trúc giống hệt interface bên React Native
@@ -23,3 +23,10 @@ class RecipeSearchRequest(BaseModel):
 
 class RecipeSearchResponse(BaseModel):
     recipes: List[AIAnalysisResult]
+
+class CommentCreate(BaseModel):
+    content: str
+    parent_comment_id: Optional[int] = None
+
+class RatingCreate(BaseModel):
+    score: int = Field(..., ge=1, le=5, description="Điểm đánh giá từ 1 đến 5 sao")
