@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from app.models.database import Base
 
@@ -17,4 +17,12 @@ class UserDB(Base):
     
     is_admin = Column(Boolean, default=False)
     
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class FollowDB(Base):
+    __tablename__ = "follows"
+
+    follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

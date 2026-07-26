@@ -8,11 +8,12 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchReels, toggleLikeReel } from '@/services/reelService';
+import { fetchReels, toggleLikeReel, followUser, unfollowUser } from '@/services/reelService';
 import { CommentModal } from '@/components/CommentModal';
 import { SharePostModal } from '@/components/SharePostModal';
 import CreateReelModal from '@/components/reels/CreateReelModal';
@@ -85,19 +86,43 @@ export default function PlayScreen() {
     }
   };
 
-  // Hàm xử lý theo dõi/bỏ theo dõi đầu bếp ảo
-  const toggleFollow = (reelId: string) => {
+  // Hàm xử lý theo dõi/bỏ theo dõi đầu bếp ảo bằng API thực tế (Optimistic UI)
+  const toggleFollow = async (reelId: string) => {
+    const targetReel = reels.find((r) => r.id === reelId);
+    if (!targetReel) return;
+
+    const targetUserId = parseInt(targetReel.author.id.replace('user-', ''), 10);
+    if (isNaN(targetUserId)) return;
+
+    // 1. Optimistic Update (Cập nhật giao diện lập tức)
+    const previousReelsState = reels;
+    const isCurrentlyFollowing = targetReel.author.isFollowing;
+
+    // Cập nhật tất cả các video của cùng tác giả này trên màn hình hiện tại
     setReels((prev) =>
       prev.map((r) => {
-        if (r.id === reelId) {
+        if (r.author.id === targetReel.author.id) {
           return {
             ...r,
-            author: { ...r.author, isFollowing: !r.author.isFollowing },
+            author: { ...r.author, isFollowing: !isCurrentlyFollowing },
           };
         }
         return r;
       })
     );
+
+    try {
+      // 2. Gọi API tương ứng từ backend chạy ngầm
+      if (isCurrentlyFollowing) {
+        await unfollowUser(targetUserId);
+      } else {
+        await followUser(targetUserId);
+      }
+    } catch (err: any) {
+      // 3. Rollback nếu có lỗi hoặc chưa đăng nhập
+      setReels(previousReelsState);
+      Alert.alert('Thao tác thất bại', err.message || 'Bạn cần đăng nhập để theo dõi đầu bếp.');
+    }
   };
 
   // Hàm bật/tắt tiếng chung cho toàn bộ các video đang phát
@@ -180,7 +205,21 @@ export default function PlayScreen() {
       <CommentModal
         visible={isCommentModalOpen}
         onClose={() => setIsCommentModalOpen(false)}
-        postTitle={activeReelForModal?.recipe?.title}
+        postTitle={activeReelForModal?.caption}
+        reelDbId={activeReelForModal?.db_id}
+        onCommentAdded={(newCount) => {
+          if (activeReelForModal) {
+            // Cập nhật số lượng bình luận hiển thị động trên UI Reels chính
+            setReels((prev) =>
+              prev.map((r) => {
+                if (r.id === activeReelForModal.id) {
+                  return { ...r, commentsCount: newCount };
+                }
+                return r;
+              })
+            );
+          }
+        }}
       />
 
       <SharePostModal
