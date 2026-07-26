@@ -90,6 +90,30 @@ def format_recipe_summary(recipe: RecipeDB):
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
 
+# API LẤY DANH SÁCH TRENDING RECIPES
+@router.get("/trending")
+def get_trending_recipes(limit: int = 10, db: Session = Depends(get_db)):
+    """Lấy danh sách các món ăn đang hot dựa trên trending_score"""
+    try:
+        recipes = db.query(RecipeDB).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
+        
+        results = []
+        for index, recipe in enumerate(recipes):
+            summary = format_recipe_summary(recipe)
+            # Gắn badge cho top 3 món cao điểm nhất
+            if index < 3:
+                summary["badge"] = "Đang Hot 🚀"
+            results.append(summary)
+            
+        return success_response(data=results, message="Lấy danh sách Trending thành công")
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy Trending Recipes: {e}")
+        raise CustomException(
+            message=f"Lỗi hệ thống khi lấy danh sách Trending",
+            code="FETCH_TRENDING_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 # API LƯU CÔNG THỨC VÀO SỔ TAY
 @router.post("/save")
 def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):

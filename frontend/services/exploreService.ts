@@ -17,6 +17,20 @@ export interface CategoryItem {
   slug: string;
 }
 
+export interface TrendingRecipeItem {
+  id: number | string;
+  title: string;
+  author: any;
+  image: string;
+  badge?: string;
+  cookTime?: string;
+  saved?: boolean;
+  save_count?: number;
+  ratings_avg?: number;
+  ratings_count?: number;
+}
+
+
 export const fetchCategories = async (): Promise<CategoryItem[]> => {
   try {
     const response = await fetch(`${getApiBaseUrl()}/recipes/categories`);
@@ -27,6 +41,30 @@ export const fetchCategories = async (): Promise<CategoryItem[]> => {
     return [];
   } catch (error) {
     console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+export const fetchTrendingRecipes = async (limit: number = 10): Promise<TrendingRecipeItem[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/recipes/trending?limit=${limit}`);
+    const data = await response.json();
+    if (data.status === 'success') {
+      // Map về cấu trúc của TrendingRecipeItem để UI dễ hiển thị
+      return data.data.map((item: any) => ({
+        id: item.id.toString(),
+        title: item.title,
+        author: item.author?.name || 'Chef',
+        image: item.image,
+        badge: item.badge,
+        cookTime: item.cook_time_minutes ? `${item.cook_time_minutes} phút` : '30 phút',
+        saved: false,
+        savesCount: item.save_count || 0,
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching trending recipes:', error);
     return [];
   }
 };

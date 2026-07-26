@@ -11,9 +11,8 @@ import {
   MOCK_EXPLORE_GRID,
   MOCK_POSTS,
   PostItem,
-  TrendingRecipeItem,
 } from '@/services/mockCommunityData';
-import { fetchPopularChefs, ChefInfo } from '@/services/exploreService';
+import { fetchPopularChefs, ChefInfo, fetchTrendingRecipes, TrendingRecipeItem } from '@/services/exploreService';
 import { fetchHotTags, TagInfo } from '@/services/tagService';
 
 // Modular Refactored Components
@@ -91,7 +90,7 @@ export default function HomeScreen() {
 
   const [posts, setPosts] = useState<PostItem[]>(MOCK_POSTS);
   const [chefs, setChefs] = useState<ChefInfo[]>([]);
-  const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>(MOCK_TRENDING_RECIPES);
+  const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>([]);
   const [hotTags, setHotTags] = useState<TagInfo[]>([]);
 
   useEffect(() => {
@@ -103,8 +102,13 @@ export default function HomeScreen() {
       const popularChefs = await fetchPopularChefs();
       if (popularChefs.length > 0) setChefs(popularChefs);
     };
+    const loadTrending = async () => {
+      const trending = await fetchTrendingRecipes();
+      if (trending.length > 0) setTrendingRecipes(trending);
+    };
     loadTags();
     loadChefs();
+    loadTrending();
   }, []);
 
   // Modals state
@@ -172,7 +176,7 @@ export default function HomeScreen() {
     );
   };
 
-  const toggleSaveTrending = (id: string) => {
+  const toggleSaveTrending = (id: string | number) => {
     setTrendingRecipes((prev) =>
       prev.map((t) => (t.id === id ? { ...t, saved: !t.saved } : t))
     );

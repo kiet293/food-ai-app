@@ -97,7 +97,7 @@ export default function SearchPage() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <MaterialIcons name="arrow-back" size={24} color="#111" />
         </Pressable>
-        <Text style={styles.title}>Tìm Kiếm Gợi Ý Món Ăn</Text>
+        <Text style={styles.title}>Tìm Kiếm Công Thức Nấu Ăn</Text>
       </View>
 
       {/* Search Input Box */}
