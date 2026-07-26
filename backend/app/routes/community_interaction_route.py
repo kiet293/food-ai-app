@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Body, status
 from sqlalchemy.orm import Session
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, CommentDB, RatingDB
-from app.models.user_model import UserDB
+from app.models.user_model import UserDB, FollowDB
 from app.schemas.recipe import CommentCreate, RatingCreate
 from app.utils.deps import get_current_user
 from app.utils.response import success_response, CustomException
@@ -255,5 +255,106 @@ def rate_recipe(
         raise CustomException(
             message="Lỗi hệ thống khi gửi đánh giá",
             code="RATE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API THEO DÕI NGƯỜI DÙNG (POST /api/users/{id}/follow)
+@router.post("/users/{id}/follow")
+def follow_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Không được tự theo dõi chính mình
+        if current_user.id == id:
+            raise CustomException(
+                message="Bạn không thể tự theo dõi chính mình",
+                code="SELF_FOLLOW_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Kiểm tra người dùng được theo dõi có tồn tại không
+        target_user = db.query(UserDB).filter(UserDB.id == id).first()
+        if not target_user:
+            raise CustomException(
+                message="Không tìm thấy người dùng",
+                code="USER_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+            
+        # Kiểm tra xem đã theo dõi chưa
+        existing_follow = db.query(FollowDB).filter(
+            FollowDB.follower_id == current_user.id,
+            FollowDB.following_id == id
+        ).first()
+        
+        if existing_follow:
+            return success_response(
+                message="Bạn đã theo dõi người dùng này rồi!",
+                data={"isFollowing": True}
+            )
+            
+        # Thêm bản ghi mới
+        new_follow = FollowDB(
+            follower_id=current_user.id,
+            following_id=id
+        )
+        db.add(new_follow)
+        db.commit()
+        
+        return success_response(
+            message="Theo dõi người dùng thành công!",
+            data={"isFollowing": True}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi theo dõi người dùng: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi theo dõi người dùng",
+            code="FOLLOW_USER_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API HỦY THEO DÕI NGƯỜI DÙNG (DELETE /api/users/{id}/follow)
+@router.delete("/users/{id}/follow")
+def unfollow_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Kiểm tra bản ghi theo dõi
+        existing_follow = db.query(FollowDB).filter(
+            FollowDB.follower_id == current_user.id,
+            FollowDB.following_id == id
+        ).first()
+        
+        if not existing_follow:
+            raise CustomException(
+                message="Bạn chưa theo dõi người dùng này",
+                code="NOT_FOLLOWING_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+            
+        db.delete(existing_follow)
+        db.commit()
+        
+        return success_response(
+            message="Đã hủy theo dõi người dùng!",
+            data={"isFollowing": False}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi hủy theo dõi người dùng: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi hủy theo dõi",
+            code="UNFOLLOW_USER_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

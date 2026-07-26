@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Body, status, Request  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from app.models.database import get_db
-from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB
+from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB, ReelCommentLikeDB
 from app.models.recipe_model import RecipeDB
-from app.models.user_model import UserDB
+from app.models.user_model import UserDB, FollowDB
 from app.schemas.reel import ReelCreate, ReelCommentCreate
 from app.utils.deps import get_current_user
 from app.utils.response import success_response, CustomException
@@ -28,6 +28,151 @@ def get_optional_current_user(request: Request, db: Session = Depends(get_db)):
         pass
     return None
 
+import os
+import urllib.request
+import json
+import ssl
+
+def sync_pexels_cooking_videos(db: Session):
+    pexels_key = os.getenv("PEXELS_API_KEY")
+    if not pexels_key:
+        print("[PEXELS] PEXELS_API_KEY khong duoc cau hinh trong .env.")
+        return
+
+    # Kiem tra xem co bao nhieu reels trong DB. Neu da co nhieu (>= 15), khong can pull them de tranh overload
+    reels_count = db.query(ReelDB).count()
+    if reels_count >= 15:
+        return
+
+    print("[PEXELS] Dang pull them video tu Pexels vi database dang co it video...")
+    try:
+        # Bo qua xac thuc SSL (tranh loi tren mot so may Windows)
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        url = "https://api.pexels.com/videos/search?query=cooking&per_page=12&orientation=portrait"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": pexels_key,
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            videos = res_data.get("videos", [])
+
+            last_names = ["Nguyen", "Tran", "Le", "Pham", "Hoang", "Huynh", "Phan", "Vu", "Vo", "Dang", "Bui", "Do", "Ho", "Ngo"]
+            first_names = [
+                "Minh Anh", "Gia Khanh", "Hong Hanh", "Tuan Kiet", "Bao Chau", 
+                "Huu Phuoc", "Thanh Van", "Quoc Anh", "Nhat Linh", "Phuong Trinh",
+                "Thanh Nam", "Xuan Truong", "Trong Hieu", "Thu Trang", "Bich Ngoc",
+                "Dinh Phong", "Khanh Ha", "The Dat", "Hoai An", "Cam Tu"
+            ]
+            avatars = [
+                "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=150",
+                "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150",
+                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+                "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150"
+            ]
+
+            for v in videos:
+                # 1. Tim link video phu hop
+                video_files = v.get("video_files", [])
+                video_url = None
+                for f in video_files:
+                    if f.get("width") and f.get("height") and f.get("width") < f.get("height"):
+                        video_url = f.get("link")
+                        break
+                if not video_url and video_files:
+                    video_url = video_files[0].get("link")
+
+                if not video_url:
+                    continue
+
+                # Kiem tra xem video da co trong database chua
+                exists = db.query(ReelDB).filter(ReelDB.video_url == video_url).first()
+                if exists:
+                    continue
+
+                # 2. Tu dong dang ky va Viet hoa tai khoan tac gia
+                photographer_id = v.get("user", {}).get("id")
+                if not photographer_id:
+                    continue
+
+                username = f"pexels_user_{photographer_id}"
+                author = db.query(UserDB).filter(UserDB.username == username).first()
+                if not author:
+                    last_idx = photographer_id % len(last_names)
+                    first_idx = (photographer_id * 3) % len(first_names)
+                    title = "Đầu bếp " if photographer_id % 2 == 0 else "Chef "
+                    
+                    vietnamese_names_unicode = [
+                        "Minh Anh", "Gia Khánh", "Hồng Hạnh", "Tuấn Kiệt", "Bảo Châu", 
+                        "Hữu Phước", "Thanh Vân", "Quốc Anh", "Nhật Linh", "Phương Trinh",
+                        "Thành Nam", "Xuân Trường", "Trọng Hiếu", "Thu Trang", "Bích Ngọc",
+                        "Đình Phong", "Khánh Hà", "Thế Đạt", "Hoài An", "Cẩm Tú"
+                    ]
+                    vietnamese_last_names_unicode = ["Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ", "Hồ", "Ngô"]
+                    
+                    full_name = f"{title}{vietnamese_last_names_unicode[last_idx]} {vietnamese_names_unicode[first_idx]}"
+                    avatar = avatars[photographer_id % len(avatars)]
+                    
+                    author = UserDB(
+                        username=username,
+                        hashed_password="pexels_placeholder_password",
+                        full_name=full_name,
+                        avatar=avatar
+                    )
+                    db.add(author)
+                    db.commit()
+                    db.refresh(author)
+
+                # 3. Tao va luu Reels moi vao PostgreSQL
+                captions_unicode = [
+                    "Hôm nay cùng mình vào bếp chuẩn bị món ăn siêu hấp dẫn này nhé! 🥗 #HealthyEating #KitchenLife #Cooking",
+                    "Bí quyết làm nước sốt ngon tuyệt đỉnh từ hương vị tự nhiên! 🥫✨ #ChefCooking #Homemade #Yummy",
+                    "Kỹ năng chuẩn bị nguyên liệu nhanh gọn nhẹ cho người bận rộn. 🔪🧅 #MealPrep #Tips #Freshfood",
+                    "Thêm một công thức bánh ngọt ngào cho ngày cuối tuần hạnh phúc! 🍫🎂 #BakingDay #SweetTooth #Dessert",
+                    "Món ngon mỗi ngày cực kỳ dễ làm tại nhà cho cả gia đình! 🍳❤️ #FamilyMeal #Delicious #CookAtHome",
+                    "Hương vị thơm lừng đánh thức mọi giác quan của bạn! 🥓🔥 #FoodLover #CookingTime #Breakfast",
+                    "Rửa sạch và giữ độ tươi ngon tự nhiên cho rau củ quả. 🥦💦 #CleanFood #HealthTips #GreenLife",
+                    "Trải nghiệm công thức salad trộn dầu giấm siêu thanh mát đẹp da! 🥗☀️ #HealthyDiet #FitnessFood #EasyRecipe"
+                ]
+                
+                poster_url = v.get("image") or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800"
+                new_reel = ReelDB(
+                    user_id=author.id,
+                    video_url=video_url,
+                    poster_url=poster_url,
+                    caption=captions_unicode[v.get("id") % len(captions_unicode)],
+                    recipe_id=None
+                )
+                db.add(new_reel)
+                db.commit()
+                
+                # Them tuong tac thich & binh luan ao ban dau
+                mock_like = ReelLikeDB(reel_id=new_reel.id, user_id=author.id)
+                db.add(mock_like)
+                
+                mock_comment = ReelCommentDB(
+                    reel_id=new_reel.id,
+                    user_id=author.id,
+                    content="Món này nhìn ngon quá! Rất dễ làm theo."
+                )
+                db.add(mock_comment)
+                db.commit()
+
+            print("[PEXELS] Da dong bo thanh cong cac video tu Pexels vao PostgreSQL!")
+    except Exception as e:
+        db.rollback()
+        print(f"[PEXELS] Loi khi sync video tu Pexels: {e}")
+
 # 1. API LẤY DANH SÁCH CLIPS (GET /api/reels)
 @router.get("")
 def get_reels(
@@ -35,6 +180,9 @@ def get_reels(
     current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
+        # Tự động đồng bộ thêm video nấu ăn từ Pexels API
+        sync_pexels_cooking_videos(db)
+        
         reels = db.query(ReelDB).order_by(ReelDB.created_at.desc()).all()
         
         result_list = []
@@ -51,6 +199,15 @@ def get_reels(
             # 2. Đếm số lượt thích & bình luận
             likes_count = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == reel.id).count()
             comments_count = db.query(ReelCommentDB).filter(ReelCommentDB.reel_id == reel.id).count()
+
+            # 4. Kiểm tra xem người dùng hiện tại đã follow tác giả video này chưa
+            is_following = False
+            if current_user:
+                follow_exists = db.query(FollowDB).filter(
+                    FollowDB.follower_id == current_user.id,
+                    FollowDB.following_id == reel.user_id
+                ).first()
+                is_following = follow_exists is not None
 
             # 3. Lấy thông tin công thức đính kèm nếu có
             recipe_info = None
@@ -69,7 +226,7 @@ def get_reels(
                     "id": f"user-{reel.author.id}",
                     "name": reel.author.full_name or reel.author.username,
                     "avatar": reel.author.avatar,
-                    "isFollowing": False # Có thể cập nhật logic follow sau
+                    "isFollowing": is_following
                 },
                 "caption": reel.caption or "",
                 "videoUrl": reel.video_url,
@@ -203,7 +360,8 @@ def toggle_like_reel(
 @router.get("/{reel_id}/comments")
 def get_reel_comments(
     reel_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
         comments = db.query(ReelCommentDB).filter(
@@ -212,6 +370,20 @@ def get_reel_comments(
 
         result = []
         for c in comments:
+            # Kiểm tra xem user hiện tại đã thích bình luận này chưa
+            is_liked = False
+            if current_user:
+                like_exists = db.query(ReelCommentLikeDB).filter(
+                    ReelCommentLikeDB.comment_id == c.id,
+                    ReelCommentLikeDB.user_id == current_user.id
+                ).first()
+                is_liked = like_exists is not None
+
+            # Đếm số lượt thích bình luận
+            likes_count = db.query(ReelCommentLikeDB).filter(
+                ReelCommentLikeDB.comment_id == c.id
+            ).count()
+
             result.append({
                 "id": c.id,
                 "user": {
@@ -220,7 +392,9 @@ def get_reel_comments(
                     "avatar": c.user.avatar
                 },
                 "content": c.content,
-                "created_at": c.created_at.isoformat() if c.created_at else None
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "likesCount": likes_count,
+                "isLiked": is_liked
             })
 
         return success_response(
@@ -280,7 +454,9 @@ def create_reel_comment(
                     "avatar": current_user.avatar
                 },
                 "content": new_comment.content,
-                "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None
+                "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None,
+                "likesCount": 0,
+                "isLiked": False
             },
             message="Bình luận đã được đăng thành công!"
         )
@@ -292,6 +468,61 @@ def create_reel_comment(
         raise CustomException(
             message="Lỗi hệ thống khi lưu bình luận",
             code="CREATE_REEL_COMMENT_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# 6. API THẢ TIM / BỎ THẢ TIM BÌNH LUẬN (POST /api/reels/comments/{comment_id}/like)
+@router.post("/comments/{comment_id}/like")
+def toggle_like_reel_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Kiểm tra bình luận tồn tại
+        comment = db.query(ReelCommentDB).filter(ReelCommentDB.id == comment_id).first()
+        if not comment:
+            raise CustomException(
+                message="Không tìm thấy bình luận",
+                code="COMMENT_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        # Kiểm tra xem đã thích bình luận chưa
+        like_record = db.query(ReelCommentLikeDB).filter(
+            ReelCommentLikeDB.comment_id == comment_id,
+            ReelCommentLikeDB.user_id == current_user.id
+        ).first()
+
+        if like_record:
+            # Đã thích -> Bỏ thích
+            db.delete(like_record)
+            db.commit()
+            return success_response(
+                data={"isLiked": False},
+                message="Đã bỏ thích bình luận!"
+            )
+        else:
+            # Chưa thích -> Thêm lượt thích
+            new_like = ReelCommentLikeDB(
+                comment_id=comment_id,
+                user_id=current_user.id
+            )
+            db.add(new_like)
+            db.commit()
+            return success_response(
+                data={"isLiked": True},
+                message="Đã thích bình luận!"
+            )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi khi thích/bỏ thích bình luận: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi thực hiện hành động thích bình luận",
+            code="LIKE_COMMENT_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
