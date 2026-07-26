@@ -17,12 +17,15 @@ class UserDB(Base):
     
     is_admin = Column(Boolean, default=False)
     
+    follower_count = Column(Integer, default=0, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class FollowDB(Base):
     __tablename__ = "follows"
 
-    follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

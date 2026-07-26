@@ -1,20 +1,20 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserProfile } from '@/services/authService';
 import useRecentSearches from '@/hooks/useRecentSearches';
 import {
   MOCK_COLLECTIONS,
-  MOCK_CHEFS,
   MOCK_TRENDING_RECIPES,
   MOCK_HOT_TAGS,
   MOCK_EXPLORE_GRID,
   MOCK_POSTS,
   PostItem,
-  ChefItem,
   TrendingRecipeItem,
 } from '@/services/mockCommunityData';
+import { fetchPopularChefs, ChefInfo } from '@/services/exploreService';
+import { fetchHotTags, TagInfo } from '@/services/tagService';
 
 // Modular Refactored Components
 import { HomeHeader } from '@/components/explore/HomeHeader';
@@ -29,9 +29,9 @@ import { HotTagsSection } from '@/components/explore/HotTagsSection';
 import { ExploreGridSection } from '@/components/explore/ExploreGridSection';
 import { FollowingFeedSection } from '@/components/explore/FollowingFeedSection';
 import { IngredientDetailModal } from '@/components/explore/IngredientDetailModal';
-import { CreatePostModal } from '@/components/CreatePostModal';
-import { CommentModal } from '@/components/CommentModal';
-import { SharePostModal } from '@/components/SharePostModal';
+import { CreatePostModal } from '@/components/community/CreatePostModal';
+import { CommentModal } from '@/components/community/CommentModal';
+import { SharePostModal } from '@/components/community/SharePostModal';
 
 const ingredientCardsData: IngredientCard[] = [
   {
@@ -90,14 +90,40 @@ export default function HomeScreen() {
   const { items: recentItems, remove: removeRecent } = useRecentSearches();
 
   const [posts, setPosts] = useState<PostItem[]>(MOCK_POSTS);
-  const [chefs, setChefs] = useState<ChefItem[]>(MOCK_CHEFS);
+  const [chefs, setChefs] = useState<ChefInfo[]>([]);
   const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>(MOCK_TRENDING_RECIPES);
+  const [hotTags, setHotTags] = useState<TagInfo[]>([]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      const tags = await fetchHotTags();
+      if (tags) setHotTags(tags);
+    };
+    const loadChefs = async () => {
+      const popularChefs = await fetchPopularChefs();
+      if (popularChefs.length > 0) setChefs(popularChefs);
+    };
+    loadTags();
+    loadChefs();
+  }, []);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [activePostForModal, setActivePostForModal] = useState<PostItem | null>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshTrigger(prev => prev + 1);
+    // Fake loading delay for other mock sections
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -203,7 +229,13 @@ export default function HomeScreen() {
 
       {/* Main Content Area */}
       {activeTab === 'GLOBAL' ? (
-        <ScrollView style={styles.contentScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.contentScroll} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
+          }
+        >
           {/* AI Meal Suggestion Banner */}
           <AiMealSuggestionBanner />
 
@@ -218,11 +250,11 @@ export default function HomeScreen() {
             toggleSaveTrending={toggleSaveTrending}
           />
           <HotTagsSection
-            tags={MOCK_HOT_TAGS}
+            tags={hotTags.length > 0 ? hotTags.map(t => t.name) : MOCK_HOT_TAGS}
             selectedTag={selectedTag}
             setSelectedTag={setSelectedTag}
           />
-          <ExploreGridSection />
+          <ExploreGridSection refreshTrigger={refreshTrigger} />
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -279,6 +311,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   contentScroll: {
     flex: 1,

@@ -31,7 +31,7 @@ export const HotTagsSection: React.FC<HotTagsSectionProps> = ({
               onPress={() => setSelectedTag(tag)}
             >
               <Text style={[styles.tagPillText, isSelected && styles.tagPillTextActive]}>
-                {tag}
+                #{tag}
               </Text>
             </TouchableOpacity>
           );

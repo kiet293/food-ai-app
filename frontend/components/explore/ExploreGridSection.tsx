@@ -6,7 +6,7 @@ import { fetchExploreGrid, ExploreGridItem } from '@/services/exploreService';
 const { width } = Dimensions.get('window');
 const GRID_ITEM_WIDTH = (width - 44) / 3;
 
-export const ExploreGridSection: React.FC = () => {
+export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refreshTrigger = 0 }) => {
   const router = useRouter();
   const [data, setData] = useState<ExploreGridItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -29,13 +29,32 @@ export const ExploreGridSection: React.FC = () => {
     setIsLoading(false);
   };
 
+  const refresh = async () => {
+    setIsLoading(true);
+    const response = await fetchExploreGrid(null, 18);
+    setData(response.items);
+    if (response.next_cursor) {
+      setCursor(response.next_cursor);
+      setHasMore(true);
+    } else {
+      setCursor(null);
+      setHasMore(false);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      refresh();
+    }
+  }, [refreshTrigger]);
+
   useEffect(() => {
     loadMore();
   }, []);
 
-  const renderItem = ({ item }: { item: ExploreGridItem }) => (
+  const renderItem = ({ item, index }: { item: ExploreGridItem, index: number }) => (
     <TouchableOpacity 
-      key={item.id} 
       style={styles.gridItem}
       onPress={() => router.push({ pathname: "/explore-detail/[id]", params: { id: item.id } })}
       activeOpacity={0.8}
@@ -52,7 +71,7 @@ export const ExploreGridSection: React.FC = () => {
       <FlatList
         data={data}
         numColumns={3}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => `explore-${item.id}-${index}`}
         renderItem={renderItem}
         onEndReached={() => {
           if (data.length > 0) loadMore();

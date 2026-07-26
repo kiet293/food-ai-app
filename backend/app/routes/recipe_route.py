@@ -8,12 +8,14 @@ import cloudinary.uploader
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.database import get_db
-from app.models.recipe_model import RecipeDB, RecipeStatsDB, RatingDB, CommentDB
-from app.schemas.recipe import AIAnalysisResult # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
+from app.models.recipe_model import RecipeDB, RecipeStatsDB, RatingDB, CommentDB, CategoryDB, RecipeCategoryDB, TagDB, RecipeTagDB
+from app.schemas.recipe import AIAnalysisResult, RateRecipeRequest # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
 from app.models.user_model import UserDB
 from app.utils.deps import get_current_user
 from app.crud.recipe_stats import record_recipe_save
 from app.utils.response import success_response, CustomException
+import unicodedata
+import re
 
 # Khai báo tags chung cho toàn bộ API trong file này
 router = APIRouter(tags=["Recipes - Sổ tay & Xu hướng"])
@@ -21,6 +23,12 @@ router = APIRouter(tags=["Recipes - Sổ tay & Xu hướng"])
 # ====================================================================================================
 # HÀM HỖ TRỢ (HELPER FUNCTIONS)
 # ====================================================================================================
+
+def slugify(text: str) -> str:
+    """Tạo slug từ chuỗi (loại bỏ dấu tiếng Việt, chuyển sang lowercase)"""
+    text = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
+    text = re.sub(r'[^\w\s-]', '', text).strip().lower()
+    return re.sub(r'[-\s]+', '-', text)
 
 def upload_image_to_cloudinary(image: UploadFile) -> str:
     """Tải ảnh lên Cloudinary và trả về secure_url."""
@@ -210,6 +218,8 @@ def create_recipe(
     cook_time_minutes: int = Form(None),
     servings: int = Form(None),
     difficulty: str = Form(None),
+    category_name: str = Form(None),
+    tags: str = Form(None), # Danh sách tag dưới dạng JSON string
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -248,6 +258,42 @@ def create_recipe(
             db.commit()
             db.refresh(new_recipe)
             
+            # Xử lý Category
+            if category_name:
+                category = db.query(CategoryDB).filter(CategoryDB.name == category_name).first()
+                if category:
+                    recipe_cat = RecipeCategoryDB(recipe_id=new_recipe.id, category_id=category.id)
+                    db.add(recipe_cat)
+
+            # Xử lý Tags
+            if tags:
+                try:
+                    parsed_tags = json.loads(tags)
+                    if isinstance(parsed_tags, list):
+                        for tag_name in parsed_tags:
+                            tag_name = tag_name.strip()
+                            if not tag_name: continue
+                            
+                            tag_slug = slugify(tag_name)
+                            # Kiểm tra tag đã tồn tại chưa
+                            existing_tag = db.query(TagDB).filter(TagDB.slug == tag_slug).first()
+                            
+                            if not existing_tag:
+                                existing_tag = TagDB(name=tag_name, slug=tag_slug, usage_count=1)
+                                db.add(existing_tag)
+                                db.commit() # Cần commit để lấy ID
+                                db.refresh(existing_tag)
+                            else:
+                                existing_tag.usage_count += 1
+                            
+                            # Liên kết Tag với Recipe
+                            recipe_tag = RecipeTagDB(recipe_id=new_recipe.id, tag_id=existing_tag.id)
+                            db.add(recipe_tag)
+                except json.JSONDecodeError as e:
+                    print(f"Lỗi parse tags JSON: {e}")
+
+            db.commit()
+            
             print(f"✅ Đã tạo công thức mới: {new_recipe.recipe_name}")
             return success_response(data={"recipe_id": new_recipe.id}, message="Đăng tải công thức thành công!")
         except Exception as e:
@@ -272,6 +318,23 @@ def create_recipe(
             code="CREATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ====================================================================================================
+# API QUẢN LÝ DANH MỤC (CATEGORIES)
+# ====================================================================================================
+
+@router.get("/categories")
+def get_categories(db: Session = Depends(get_db)):
+    """
+    Lấy danh sách tất cả các danh mục món ăn (Category)
+    """
+    try:
+        categories = db.query(CategoryDB).order_by(CategoryDB.id).all()
+        result = [{"id": c.id, "name": c.name, "slug": c.slug} for c in categories]
+        return success_response(result)
+    except Exception as e:
+        raise CustomException(status_code=500, message=f"Lỗi khi lấy danh mục: {str(e)}")
 
 
 # ====================================================================================================
@@ -611,4 +674,56 @@ def update_recipe(
             message="Lỗi hệ thống khi cập nhật công thức",
             code="UPDATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@router.post("/{recipe_id}/rate")
+def rate_recipe(
+    recipe_id: int, 
+    request: RateRecipeRequest, 
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # 1. Kiểm tra công thức có tồn tại không
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=404
+            )
+            
+        # 2. Xử lý logic đánh giá
+        existing_rating = db.query(RatingDB).filter(
+            RatingDB.recipe_id == recipe_id, 
+            RatingDB.user_id == current_user.id
+        ).first()
+        
+        if existing_rating:
+            existing_rating.score = request.score
+        else:
+            new_rating = RatingDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                score=request.score
+            )
+            db.add(new_rating)
+            
+        # 3. Xử lý logic comment nếu có nhập chữ
+        if request.comment and request.comment.strip():
+            new_comment = CommentDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                content=request.comment.strip()
+            )
+            db.add(new_comment)
+            
+        db.commit()
+        return success_response(message="Đánh giá công thức thành công!")
+    except Exception as e:
+        db.rollback()
+        raise CustomException(
+            message=f"Lỗi khi lưu đánh giá: {e}",
+            code="RATE_RECIPE_ERROR",
+            status_code=500
         )

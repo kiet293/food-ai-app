@@ -114,3 +114,38 @@ export const updateUserProfile = async (fullName: String, avatar: String) => {
         return false;
     }
 }
+
+// HÀM CẬP NHẬT ẢNH ĐẠI DIỆN BẰNG FILE
+export const updateUserAvatar = async (imageUri: string) => {
+    try {
+        const token = await getToken();
+        if (!token) throw new Error("Chưa đăng nhập");
+
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'avatar.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('file', {
+            uri: imageUri,
+            name: filename,
+            type,
+        } as any);
+
+        const response = await fetch(`${AUTH_URL}/me/avatar`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+            },
+            body: formData,
+        });
+
+        if (!response.ok) throw new Error("Không thể tải ảnh lên");
+
+        return await response.json();
+    } catch (error) {
+        console.error("❌ Lỗi tải ảnh lên:", error);
+        throw error;
+    }
+};

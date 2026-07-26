@@ -22,7 +22,8 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getUserProfile, logoutUser, updateUserProfile } from '../../services/authService';
+import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '../../services/authService';
+import * as ImagePicker from 'expo-image-picker';
 import { getSavedRecipes } from '../../services/aiService';
 import { useAuth } from '../_layout';
 
@@ -44,6 +45,69 @@ export default function ProfileScreen() {
   const [editFullName, setEditFullName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState('👨‍🍳');
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- HÀM XỬ LÝ ẢNH ĐẠI DIỆN ---
+  const isUrl = (str: string) => str && (str.startsWith('http://') || str.startsWith('https://'));
+
+  const handleEditAvatarPress = () => {
+    Alert.alert(
+      "Cập nhật ảnh đại diện",
+      "Chọn một thao tác",
+      [
+        { text: "Tải ảnh lên...", onPress: pickImage },
+        { text: "Gỡ ảnh", onPress: removeImage, style: "destructive" },
+        { text: "Hủy", style: "cancel" }
+      ]
+    );
+  };
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Quyền truy cập", "Bạn cần cấp quyền để mở thư viện ảnh!");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      uploadAvatar(result.assets[0].uri);
+    }
+  };
+
+  const uploadAvatar = async (uri: string) => {
+    setIsLoading(true);
+    try {
+      const response = await updateUserAvatar(uri);
+      if (response && response.avatar_url) {
+        setUserInfo(prev => prev ? { ...prev, avatar: response.avatar_url } : null);
+        Alert.alert("Thành công", "Ảnh đại diện đã được cập nhật!");
+      }
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể cập nhật ảnh đại diện.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeImage = async () => {
+    setIsLoading(true);
+    try {
+      await updateUserProfile(userInfo?.full_name || '', '👨‍🍳');
+      setUserInfo(prev => prev ? { ...prev, avatar: '👨‍🍳' } : null);
+      Alert.alert("Thành công", "Đã gỡ ảnh đại diện.");
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể gỡ ảnh đại diện.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // ---------------------------------
 
   const loadProfile = async () => {
     setIsLoading(true);
@@ -138,9 +202,16 @@ export default function ProfileScreen() {
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarBorder}>
                 <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>{userInfo.avatar}</Text>
+                  {userInfo.avatar && isUrl(userInfo.avatar) ? (
+                    <Image source={{ uri: userInfo.avatar }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatarText}>{userInfo.avatar}</Text>
+                  )}
                 </View>
               </View>
+              <TouchableOpacity style={styles.editAvatarIcon} onPress={handleEditAvatarPress}>
+                <Ionicons name="pencil" size={14} color="#fff" />
+              </TouchableOpacity>
             </View>
 
             <Text style={[styles.fullNameText, { color: dynamicTextColor }]}>{userInfo.full_name}</Text>
@@ -421,6 +492,29 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 42,
+  },
+  avatarImage: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+  },
+  editAvatarIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#000',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   fullNameText: {
     fontSize: 22,

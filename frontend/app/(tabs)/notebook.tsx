@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AIAnalysisResult, deleteRecipe, getSavedRecipes } from '../../services/aiService';
-import { CreateCollectionModal } from '../../components/CreateCollectionModal';
+import { CreateCollectionModal } from '../../components/collections/CreateCollectionModal';
 
 const { width } = Dimensions.get('window');
 const COLLECTION_CARD_WIDTH = (width - 44) / 2;

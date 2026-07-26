@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
-import { AnalysisResult } from '@/components/AnalysisResult';
+import { AnalysisResult } from '@/components/ai-analysis/AnalysisResult';
 import { useImageAnalysis } from '@/hooks/useImageAnalysis';
 
 export default function ModalScreen() {

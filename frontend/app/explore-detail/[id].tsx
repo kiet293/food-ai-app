@@ -28,6 +28,16 @@ export default function ExploreDetailScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
+  // Yêu thích (Tim) hiện tại chưa có API Likes, tạm thời để state cục bộ hoặc placeholder
+  const [likedPosts, setLikedPosts] = useState<Record<number, boolean>>({});
+
+  const handleToggleLike = (id: number) => {
+    setLikedPosts(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   const loadData = async (isLoadMore = false) => {
     if (isLoading || (!hasMore && isLoadMore)) return;
 
@@ -98,33 +108,48 @@ export default function ExploreDetailScreen() {
             <Text style={styles.recipeTitle} numberOfLines={2}>
               {item.title.toUpperCase()}
             </Text>
+            <Text style={styles.recipeRatingStat}>
+              ⭐ {item.ratings_count > 0 ? `${item.ratings_avg.toFixed(1)} (${item.ratings_count} Đánh giá)` : "Chưa có đánh giá"}
+            </Text>
           </View>
         </TouchableOpacity>
 
         <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Feather name="bookmark" size={24} color="#555" />
-            <Text style={styles.actionText}>{item.save_count || 0}</Text>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleToggleLike(item.id)}
+          >
+            <Ionicons 
+              name={likedPosts[item.id] ? "heart" : "heart-outline"} 
+              size={26} 
+              color={likedPosts[item.id] ? "#f04d4f" : "#555"} 
+            />
+            <Text style={styles.actionText}>
+              {(item.cooked_count || 0) + (likedPosts[item.id] ? 1 : 0)}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.dividerVertical} />
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Feather name="check-circle" size={24} color="#555" />
-            <Text style={styles.actionText}>{item.cooked_count || 0}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerVertical} />
-
-          <TouchableOpacity style={styles.actionButton}>
-            <Feather name="message-circle" size={24} color="#555" />
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => router.push(`/recipe/${item.id}?tab=comments` as any)}
+          >
+            <Ionicons name="chatbubble-outline" size={24} color="#555" />
             <Text style={styles.actionText}>{item.comments_count || 0}</Text>
           </TouchableOpacity>
 
           <View style={styles.dividerVertical} />
 
           <TouchableOpacity style={styles.actionButton}>
-            <Feather name="send" size={24} color="#555" />
+            <Ionicons name="bookmark-outline" size={24} color="#555" />
+            <Text style={styles.actionText}>{item.save_count || 0}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.dividerVertical} />
+
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="paper-plane-outline" size={24} color="#555" />
             <Text style={styles.actionText}>Share</Text>
           </TouchableOpacity>
         </View>
@@ -280,6 +305,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
     lineHeight: 30,
+  },
+  recipeRatingStat: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginTop: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   actionBar: {
     flexDirection: 'row',

@@ -16,3 +16,13 @@ class UserProfile(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     avatar: Optional[str] = None
+
+class ChefResponse(BaseModel):
+    id: int
+    username: str
+    full_name: Optional[str] = None
+    avatar: Optional[str] = None
+    follower_count: int = 0
+
+    class Config:
+        orm_mode = True

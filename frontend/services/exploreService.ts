@@ -11,6 +11,44 @@ export interface ExploreGridItem {
   image: string;
 }
 
+export interface CategoryItem {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export const fetchCategories = async (): Promise<CategoryItem[]> => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/recipes/categories`);
+    const data = await response.json();
+    if (data.status === 'success') {
+      return data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
+};
+
+export const createRecipe = async (formData: FormData): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/recipes/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+    const data = await response.json();
+    return data.status === 'success';
+  } catch (error) {
+    console.error('Error creating recipe:', error);
+    return false;
+  }
+};
+
 export interface ExploreGridResponse {
   items: ExploreGridItem[];
   next_cursor: number | null;
@@ -24,7 +62,7 @@ export const fetchExploreGrid = async (cursor: number | null = null, limit: numb
     if (cursor !== null) {
       queryParams.append('cursor', cursor.toString());
     }
-    
+
     // Gọi API
     const API_BASE_URL = getApiBaseUrl();
 
@@ -82,7 +120,7 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
     if (startId !== null) {
       queryParams.append('start_id', startId.toString());
     }
-    
+
     // Gọi API
     const hostUri = Constants.expoConfig?.hostUri;
     const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
@@ -164,15 +202,73 @@ export const postRecipeComment = async (recipeId: number, content: string, paren
         parent_comment_id: parentCommentId || null
       })
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to post comment');
     }
-    
+
     const json = await response.json();
     return json.data;
   } catch (error) {
     console.error("❌ Lỗi khi đăng bình luận:", error);
     return null;
+  }
+};
+
+export const postRecipeRating = async (recipeId: number, score: number, comment?: string): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const API_BASE_URL = getApiBaseUrl();
+
+    const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}/rate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        score,
+        comment: comment || null
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to post rating');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("❌ Lỗi khi đăng đánh giá:", error);
+    return false;
+  }
+};
+
+export interface ChefInfo {
+  id: string;
+  name: string;
+  avatar: string;
+  isFollowing: boolean;
+  follower_count: number;
+}
+
+export const fetchPopularChefs = async (): Promise<ChefInfo[]> => {
+  try {
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/users/popular-chefs`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Server popular-chefs đang lỗi');
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error("❌ Lỗi lấy danh sách popular chefs:", error);
+    return [];
   }
 };
