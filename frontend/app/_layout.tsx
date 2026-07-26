@@ -7,7 +7,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getUserProfile, logoutUser } from '../services/authService';
+import { getUserProfile, logoutUser } from '../services/auth/authService';
 
 export const unstable_settings = {
   anchor: '(tabs)',

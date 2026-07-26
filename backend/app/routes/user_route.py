@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.models.database import get_db
-from app.models.user_model import UserDB
+from app.models.user_model import UserDB, FollowDB
 from app.models.recipe_model import RecipeDB, CollectionDB, CollectionRecipeDB, FavoriteDB
 from app.schemas.user import ChefResponse
+from app.utils.deps import get_optional_current_user
 from app.utils.response import success_response, CustomException
 
 router = APIRouter()
@@ -27,10 +28,25 @@ def get_popular_chefs(db: Session = Depends(get_db)):
     return success_response(data=chef_data, message="Fetched popular chefs successfully")
 
 @router.get("/{user_id}/profile")
-def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+def get_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if not user:
         raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Kiểm tra người dùng hiện tại đã theo dõi người này chưa (nếu đã đăng nhập)
+    is_following = False
+    is_self = False
+    if current_user:
+        is_self = current_user.id == user.id
+        if not is_self:
+            is_following = db.query(FollowDB).filter(
+                FollowDB.follower_id == current_user.id,
+                FollowDB.following_id == user.id
+            ).first() is not None
         
     # Get recent recipes authored by this user
     recent_recipes = db.query(RecipeDB).filter(RecipeDB.user_id == user_id).order_by(RecipeDB.created_at.desc()).limit(10).all()
@@ -73,6 +89,8 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
         "made_count": len(recent_recipes), # Simplified
         "want_to_make_count": want_to_make_count,
         "follower_count": user.follower_count,
+        "is_following": is_following,
+        "is_self": is_self,
         "recent_recipes": recent_data,
         "collections": collections_data
     }

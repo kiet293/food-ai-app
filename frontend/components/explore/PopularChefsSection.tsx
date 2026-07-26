@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { ChefInfo } from '../../services/exploreService';
+import { ChefInfo } from '../../services/user/userService';
 
 interface PopularChefsSectionProps {
   chefs: ChefInfo[];

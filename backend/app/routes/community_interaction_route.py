@@ -302,6 +302,7 @@ def follow_user(
             following_id=id
         )
         db.add(new_follow)
+        target_user.follower_count = (target_user.follower_count or 0) + 1
         db.commit()
         
         return success_response(
@@ -340,8 +341,11 @@ def unfollow_user(
                 code="NOT_FOLLOWING_ERROR",
                 status_code=status.HTTP_400_BAD_REQUEST
             )
-            
+
         db.delete(existing_follow)
+        target_user = db.query(UserDB).filter(UserDB.id == id).first()
+        if target_user and target_user.follower_count > 0:
+            target_user.follower_count -= 1
         db.commit()
         
         return success_response(

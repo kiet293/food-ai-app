@@ -1,16 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { getApiBaseUrl } from '../shared/apiConfig';
 
-const getBaseUrl = () => {
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-        const ipAddress = hostUri.split(':')[0];
-        return `http://${ipAddress}:5000/api/auth`;
-    }
-    return 'http://localhost:5000/api/auth';
-};
-
-const AUTH_URL = getBaseUrl();
+const AUTH_URL = `${getApiBaseUrl()}/auth`;
 
 // Hàm Đăng ký hoặc Đăng nhập chung
 export const authenticateUser = async (username: string, password: string, isLogin: boolean) => {

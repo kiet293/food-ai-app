@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { fetchExploreFeed, ExploreFeedItem } from '@/services/exploreService';
+import { fetchExploreFeed, ExploreFeedItem } from '@/services/recipe/recipeService';
 
 const { width } = Dimensions.get('window');
 

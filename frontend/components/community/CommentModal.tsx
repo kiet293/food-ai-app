@@ -15,7 +15,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchReelComments, createReelComment, toggleCommentLike, Comment } from '@/services/reelService';
+import { fetchReelComments, createReelComment, toggleCommentLike, Comment } from '@/services/reel/reelService';
 
 // Định nghĩa Props của CommentModal
 interface CommentModalProps {

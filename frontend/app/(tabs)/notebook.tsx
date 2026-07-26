@@ -17,7 +17,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AIAnalysisResult, deleteRecipe, getSavedRecipes } from '../../services/aiService';
+import { AIAnalysisResult } from '../../services/ai/aiService';
+import { deleteRecipe, getSavedRecipes } from '../../services/recipe/recipeService';
 import { CreateCollectionModal } from '../../components/collections/CreateCollectionModal';
 
 const { width } = Dimensions.get('window');

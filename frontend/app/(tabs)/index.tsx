@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getUserProfile } from '@/services/authService';
+import { getUserProfile } from '@/services/auth/authService';
 import useRecentSearches from '@/hooks/useRecentSearches';
 import {
   MOCK_COLLECTIONS,
@@ -11,9 +11,10 @@ import {
   MOCK_EXPLORE_GRID,
   MOCK_POSTS,
   PostItem,
-} from '@/services/mockCommunityData';
-import { fetchPopularChefs, ChefInfo, fetchTrendingRecipes, TrendingRecipeItem } from '@/services/exploreService';
-import { fetchHotTags, TagInfo } from '@/services/tagService';
+} from '@/services/mock/mockCommunityData';
+import { fetchPopularChefs, ChefInfo } from '@/services/user/userService';
+import { fetchTrendingRecipes, TrendingRecipeItem } from '@/services/recipe/recipeService';
+import { fetchHotTags, TagInfo } from '@/services/tag/tagService';
 
 // Modular Refactored Components
 import { HomeHeader } from '@/components/explore/HomeHeader';

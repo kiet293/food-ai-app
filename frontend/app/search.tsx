@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { searchCommunityRecipes, RecipeSummary } from "../services/searchService";
+import { searchCommunityRecipes, RecipeSummary } from "../services/search/searchService";
 
 export default function SearchPage() {
   const router = useRouter();

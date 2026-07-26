@@ -22,9 +22,9 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '../../services/authService';
+import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '../../services/auth/authService';
 import * as ImagePicker from 'expo-image-picker';
-import { getSavedRecipes } from '../../services/aiService';
+import { getSavedRecipes } from '../../services/recipe/recipeService';
 import { useAuth } from '../_layout';
 
 const EMOJI_LIST = ['👨‍🍳', '👩‍🍳', '🥷', '🐱', '🐻', '🦊', '🦁', '🥑', '🍕', '🍣', '☕', '🔥'];

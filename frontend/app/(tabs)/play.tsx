@@ -13,7 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchReels, toggleLikeReel, followUser, unfollowUser } from '@/services/reelService';
+import { fetchReels, toggleLikeReel } from '@/services/reel/reelService';
+import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
 import CreateReelModal from '@/components/reels/CreateReelModal';
