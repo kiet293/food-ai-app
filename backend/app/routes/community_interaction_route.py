@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Body, status
 from sqlalchemy.orm import Session
 from app.models.database import get_db
-from app.models.recipe_model import RecipeDB, CommentDB, RatingDB
+from app.models.recipe_model import RecipeDB, CommentDB, RatingDB, FavoriteDB
 from app.models.user_model import UserDB, FollowDB
 from app.schemas.recipe import CommentCreate, RatingCreate
 from app.utils.deps import get_current_user
@@ -255,6 +255,92 @@ def rate_recipe(
         raise CustomException(
             message="Lỗi hệ thống khi gửi đánh giá",
             code="RATE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API YÊU THÍCH CÔNG THỨC (POST /api/recipes/{id}/favorite)
+@router.post("/recipes/{id}/favorite")
+def favorite_recipe(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        existing_favorite = db.query(FavoriteDB).filter(
+            FavoriteDB.recipe_id == id,
+            FavoriteDB.user_id == current_user.id
+        ).first()
+
+        if existing_favorite:
+            return success_response(
+                message="Bạn đã yêu thích công thức này rồi!",
+                data={"isFavorited": True}
+            )
+
+        new_favorite = FavoriteDB(recipe_id=id, user_id=current_user.id)
+        db.add(new_favorite)
+        db.commit()
+
+        return success_response(
+            message="Đã thêm vào yêu thích!",
+            data={"isFavorited": True}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi yêu thích công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi yêu thích công thức",
+            code="FAVORITE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API BỎ YÊU THÍCH CÔNG THỨC (DELETE /api/recipes/{id}/favorite)
+@router.delete("/recipes/{id}/favorite")
+def unfavorite_recipe(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        existing_favorite = db.query(FavoriteDB).filter(
+            FavoriteDB.recipe_id == id,
+            FavoriteDB.user_id == current_user.id
+        ).first()
+
+        if not existing_favorite:
+            raise CustomException(
+                message="Bạn chưa yêu thích công thức này",
+                code="NOT_FAVORITED_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        db.delete(existing_favorite)
+        db.commit()
+
+        return success_response(
+            message="Đã bỏ yêu thích!",
+            data={"isFavorited": False}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi bỏ yêu thích công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi bỏ yêu thích",
+            code="UNFAVORITE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

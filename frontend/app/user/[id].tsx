@@ -121,10 +121,16 @@ export default function UserProfileScreen() {
                 <Text style={styles.statLabel}>want to make</Text>
                 <Text style={styles.statValue}>{profile.want_to_make_count}</Text>
               </View>
-              <View style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => router.push({
+                  pathname: '/user/[id]/followers',
+                  params: { id: id as string, name: profile.name, handle: profile.handle, tab: 'followers' },
+                })}
+              >
                 <Text style={styles.statLabel}>followers</Text>
                 <Text style={styles.statValue}>{followerCount}</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

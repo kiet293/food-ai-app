@@ -130,6 +130,7 @@ export interface ExploreFeedItem {
   ratings_count: number;
   comments_count: number;
   save_count: number;
+  is_favorited: boolean;
   cooked_count: number;
   created_at: string | null;
 }
@@ -149,12 +150,15 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
     }
 
     const API_RECIPES = `${getApiBaseUrl()}/recipes`;
+    const token = await getToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     const response = await fetch(`${API_RECIPES}/explore-feed?${queryParams.toString()}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers,
     });
 
     if (!response.ok) {

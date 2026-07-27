@@ -16,6 +16,7 @@ class RecipeDB(Base):
     author = relationship("UserDB", backref="recipes")
     comments = relationship("CommentDB", backref="recipe", cascade="all, delete-orphan")
     ratings = relationship("RatingDB", backref="recipe", cascade="all, delete-orphan")
+    favorites = relationship("FavoriteDB", backref="recipe", cascade="all, delete-orphan")
 
     # Tên món ăn
     recipe_name = Column(String, index=True)
@@ -162,6 +163,5 @@ class FavoriteDB(Base):
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    recipe = relationship("RecipeDB")
+
     user = relationship("UserDB")

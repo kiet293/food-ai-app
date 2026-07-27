@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -10,6 +10,27 @@ from app.utils.deps import get_optional_current_user
 from app.utils.response import success_response, CustomException
 
 router = APIRouter()
+
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80"
+
+def _serialize_follow_user(db: Session, other_user: UserDB, current_user: Optional[UserDB]) -> dict:
+    is_following = False
+    is_self = False
+    if current_user:
+        is_self = current_user.id == other_user.id
+        if not is_self:
+            is_following = db.query(FollowDB).filter(
+                FollowDB.follower_id == current_user.id,
+                FollowDB.following_id == other_user.id
+            ).first() is not None
+    return {
+        "id": str(other_user.id),
+        "name": other_user.full_name or other_user.username,
+        "handle": f"@{other_user.username}",
+        "avatar": other_user.avatar or DEFAULT_AVATAR,
+        "is_following": is_following,
+        "is_self": is_self,
+    }
 
 @router.get("/popular-chefs", response_model=dict)
 def get_popular_chefs(db: Session = Depends(get_db)):
@@ -96,3 +117,73 @@ def get_user_profile(
     }
     
     return success_response(data=profile_data, message="Fetched user profile successfully")
+
+@router.get("/{user_id}/followers")
+def get_user_followers(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    target = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not target:
+        raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Những người đang follow user_id (follower_id -> following_id == user_id)
+    query = db.query(FollowDB).filter(FollowDB.following_id == user_id).order_by(FollowDB.created_at.desc())
+    total_items = query.count()
+    total_pages = (total_items + limit - 1) // limit if total_items else 0
+    rows = query.offset((page - 1) * limit).limit(limit).all()
+
+    follower_ids = [r.follower_id for r in rows]
+    users_by_id = {u.id: u for u in db.query(UserDB).filter(UserDB.id.in_(follower_ids)).all()}
+    items = [_serialize_follow_user(db, users_by_id[fid], current_user) for fid in follower_ids if fid in users_by_id]
+
+    return success_response(
+        data={
+            "items": items,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "total_items": total_items,
+                "limit": limit
+            }
+        },
+        message="Fetched followers successfully"
+    )
+
+@router.get("/{user_id}/following")
+def get_user_following(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    target = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not target:
+        raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Những người mà user_id đang follow (follower_id == user_id -> following_id)
+    query = db.query(FollowDB).filter(FollowDB.follower_id == user_id).order_by(FollowDB.created_at.desc())
+    total_items = query.count()
+    total_pages = (total_items + limit - 1) // limit if total_items else 0
+    rows = query.offset((page - 1) * limit).limit(limit).all()
+
+    following_ids = [r.following_id for r in rows]
+    users_by_id = {u.id: u for u in db.query(UserDB).filter(UserDB.id.in_(following_ids)).all()}
+    items = [_serialize_follow_user(db, users_by_id[fid], current_user) for fid in following_ids if fid in users_by_id]
+
+    return success_response(
+        data={
+            "items": items,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "total_items": total_items,
+                "limit": limit
+            }
+        },
+        message="Fetched following successfully"
+    )
