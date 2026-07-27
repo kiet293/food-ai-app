@@ -1,21 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { getApiBaseUrl } from '../shared/apiConfig';
+import { getToken } from '../auth/authService';
 
-const getApiBaseUrl = () => {
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-        const ipAddress = hostUri.split(':')[0];
-        return `http://${ipAddress}:5000/api`;
-    }
-    return 'http://localhost:5000/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-const REELS_API_URL = `${API_BASE_URL}/reels`;
-
-const getToken = async () => {
-    return await AsyncStorage.getItem('userToken');
-};
+const REELS_API_URL = `${getApiBaseUrl()}/reels`;
 
 // 1. Hàm lấy danh sách Reels
 export const fetchReels = async () => {
@@ -244,54 +230,3 @@ export const toggleCommentLike = async (commentId: number) => {
         throw error;
     }
 };
-
-// 7. Hàm theo dõi người dùng
-export const followUser = async (userId: number) => {
-    try {
-        const token = await getToken();
-        if (!token) throw new Error("Vui lòng đăng nhập để thực hiện");
-
-        const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error("Lỗi khi theo dõi người dùng");
-        }
-
-        const resData = await response.json();
-        return resData.data; // Trả về { isFollowing: boolean }
-    } catch (error) {
-        console.error("❌ Lỗi followUser:", error);
-        throw error;
-    }
-};
-
-// 8. Hàm hủy theo dõi người dùng
-export const unfollowUser = async (userId: number) => {
-    try {
-        const token = await getToken();
-        if (!token) throw new Error("Vui lòng đăng nhập để thực hiện");
-
-        const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error("Lỗi khi hủy theo dõi người dùng");
-        }
-
-        const resData = await response.json();
-        return resData.data; // Trả về { isFollowing: boolean }
-    } catch (error) {
-        console.error("❌ Lỗi unfollowUser:", error);
-        throw error;
-    }
-};
-

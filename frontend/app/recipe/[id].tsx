@@ -20,7 +20,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { fetchRecipeDetails, postRecipeComment, postRecipeRating, RecipeDetails, CommentInfo } from '@/services/exploreService';
+import { fetchRecipeDetails, RecipeDetails } from '@/services/recipe/recipeService';
+import { postRecipeComment, postRecipeRating, CommentInfo } from '@/services/community/communityService';
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();

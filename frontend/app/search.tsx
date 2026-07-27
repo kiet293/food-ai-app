@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { searchCommunityRecipes, RecipeSummary } from "../services/searchService";
+import { searchCommunityRecipes, RecipeSummary } from "../services/search/searchService";
 
 export default function SearchPage() {
   const router = useRouter();
@@ -97,7 +97,7 @@ export default function SearchPage() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <MaterialIcons name="arrow-back" size={24} color="#111" />
         </Pressable>
-        <Text style={styles.title}>Tìm Kiếm Gợi Ý Món Ăn</Text>
+        <Text style={styles.title}>Tìm Kiếm Công Thức Nấu Ăn</Text>
       </View>
 
       {/* Search Input Box */}

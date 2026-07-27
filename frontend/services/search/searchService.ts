@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import { getApiBaseUrl } from '../shared/apiConfig';
 
 export interface RecipeSummary {
   id: number;
@@ -22,11 +22,9 @@ export const searchCommunityRecipes = async (keyword: string, page: number = 1, 
       page: page.toString(),
       limit: limit.toString()
     });
-    
+
     // Gọi API của search_route.py (Lưu ý: API này đang nằm trong nhóm /api/search)
-    const hostUri = Constants.expoConfig?.hostUri;
-    const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
-    const API_SEARCH = `http://${ipAddress}:5000/api/search`;
+    const API_SEARCH = `${getApiBaseUrl()}/search`;
 
     const response = await fetch(`${API_SEARCH}/recipes?${queryParams.toString()}`, {
       method: 'GET',

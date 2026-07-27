@@ -1,32 +1,15 @@
-from fastapi import APIRouter, Depends, Body, status, Request  # type: ignore
+from fastapi import APIRouter, Depends, Body, status  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from app.models.database import get_db
 from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB, ReelCommentLikeDB
 from app.models.recipe_model import RecipeDB
 from app.models.user_model import UserDB, FollowDB
 from app.schemas.reel import ReelCreate, ReelCommentCreate
-from app.utils.deps import get_current_user
+from app.utils.deps import get_current_user, get_optional_current_user
 from app.utils.response import success_response, CustomException
-from app.utils.security import SECRET_KEY, ALGORITHM
-from jose import jwt
 from typing import Optional
 
 router = APIRouter(tags=["Reels Management"])
-
-# Hàm phụ lấy user nếu có token (không bắt buộc đăng nhập)
-def get_optional_current_user(request: Request, db: Session = Depends(get_db)):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None
-    token = auth_header.split(" ")[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id:
-            return db.query(UserDB).filter(UserDB.id == int(user_id)).first()
-    except Exception:
-        pass
-    return None
 
 import os
 import urllib.request

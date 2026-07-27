@@ -8,12 +8,19 @@ from app.utils.response import CustomException
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import database, recipe_model, reel_model
 from app.routes import ai_route, recipe_route, auth_route, search_route, community_interaction_route, reel_route, tag_route, user_route
+from app.tasks.trending_task import trending_scheduler_task
+import asyncio
 from dotenv import load_dotenv
 import os
 app = FastAPI(title="Food AI Backend")
 load_dotenv()
 # Tự động tạo bảng trong PostgreSQL nếu chưa có
 database.Base.metadata.create_all(bind=database.engine)
+
+@app.on_event("startup")
+async def startup_event():
+    # Khởi động Task ngầm cập nhật Trending Score
+    asyncio.create_task(trending_scheduler_task())
 
 # Xử lý CORS
 app.add_middleware(

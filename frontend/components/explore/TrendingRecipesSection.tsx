@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TrendingRecipeItem } from '@/services/mockCommunityData';
+import { LinearGradient } from 'expo-linear-gradient';
+import { TrendingRecipeItem } from '@/services/recipe/recipeService';
 
 interface TrendingRecipesSectionProps {
   trendingRecipes: TrendingRecipeItem[];
-  toggleSaveTrending: (id: string) => void;
+  toggleSaveTrending: (id: string | number) => void;
 }
 
 export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
@@ -28,9 +29,15 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
             <View style={styles.trendingOverlay} />
 
             {recipe.badge && (
-              <View style={styles.recipeBadge}>
-                <Text style={styles.recipeBadgeText}>{recipe.badge}</Text>
-              </View>
+              <LinearGradient
+                colors={['#FF7A45', '#FF3D3D']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.recipeBadge}
+              >
+                <Ionicons name="flame" size={12} color="#fff" style={styles.recipeBadgeIcon} />
+                <Text style={styles.recipeBadgeText}>{recipe.badge.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</Text>
+              </LinearGradient>
             )}
 
             <View style={styles.trendingContent}>
@@ -91,17 +98,28 @@ const styles = StyleSheet.create({
   },
   recipeBadge: {
     position: 'absolute',
-    bottom: 60,
+    top: 10,
     left: 10,
-    backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#FF3D3D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  recipeBadgeIcon: {
+    marginRight: 4,
   },
   recipeBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#28a745',
+    color: '#fff',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
   trendingContent: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from './exploreService';
+import { getApiBaseUrl } from '../shared/apiConfig';
 
 export interface TagInfo {
   id: number;

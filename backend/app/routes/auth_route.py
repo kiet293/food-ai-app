@@ -7,6 +7,11 @@ from app.models.user_model import UserDB
 from app.schemas.user import UserCreate, Token, UserUpdate
 from app.utils.security import get_password_hash, verify_password, create_access_token
 
+from app.models.user_model import UserDB, FollowDB
+from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB
+from app.models.recipe_model import FavoriteDB
+
+
 router = APIRouter()
 
 # api đăng ký
@@ -44,10 +49,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Cấp Token
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
-
-from app.models.user_model import UserDB, FollowDB
-from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB
-from app.models.recipe_model import FavoriteDB
 
 @router.get("/me")
 def get_my_profile(

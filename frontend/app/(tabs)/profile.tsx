@@ -25,8 +25,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '../../services/authService';
-import { getSavedRecipes } from '../../services/aiService';
+import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '@/services/auth/authService';
+import { getSavedRecipes } from '@/services/recipe/recipeService';
 import { useAuth } from '../_layout';
 
 const { width } = Dimensions.get('window');

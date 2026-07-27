@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
   Dimensions,
   StatusBar,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { fetchExploreFeed, ExploreFeedItem } from '@/services/exploreService';
+import { fetchExploreFeed, ExploreFeedItem } from '@/services/recipe/recipeService';
+import { favoriteRecipe, unfavoriteRecipe } from '@/services/community/communityService';
 
 const { width } = Dimensions.get('window');
 
@@ -28,14 +30,29 @@ export default function ExploreDetailScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // Yêu thích (Tim) hiện tại chưa có API Likes, tạm thời để state cục bộ hoặc placeholder
-  const [likedPosts, setLikedPosts] = useState<Record<number, boolean>>({});
+  const handleToggleFavorite = async (item: ExploreFeedItem) => {
+    const previousFavorited = item.is_favorited;
+    const previousCount = item.save_count;
 
-  const handleToggleLike = (id: number) => {
-    setLikedPosts(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
+    // Optimistic update: đổi giao diện ngay, rollback nếu API lỗi
+    setData(prev => prev.map(r => r.id === item.id
+      ? { ...r, is_favorited: !previousFavorited, save_count: previousFavorited ? previousCount - 1 : previousCount + 1 }
+      : r
+    ));
+
+    try {
+      if (previousFavorited) {
+        await unfavoriteRecipe(item.id);
+      } else {
+        await favoriteRecipe(item.id);
+      }
+    } catch (err: any) {
+      setData(prev => prev.map(r => r.id === item.id
+        ? { ...r, is_favorited: previousFavorited, save_count: previousCount }
+        : r
+      ));
+      Alert.alert('Thao tác thất bại', err.message || 'Bạn cần đăng nhập để yêu thích công thức này.');
+    }
   };
 
   const loadData = async (isLoadMore = false) => {
@@ -115,23 +132,21 @@ export default function ExploreDetailScreen() {
         </TouchableOpacity>
 
         <View style={styles.actionBar}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleToggleLike(item.id)}
+            onPress={() => handleToggleFavorite(item)}
           >
-            <Ionicons 
-              name={likedPosts[item.id] ? "heart" : "heart-outline"} 
-              size={26} 
-              color={likedPosts[item.id] ? "#f04d4f" : "#555"} 
+            <Ionicons
+              name={item.is_favorited ? "heart" : "heart-outline"}
+              size={26}
+              color={item.is_favorited ? "#f04d4f" : "#555"}
             />
-            <Text style={styles.actionText}>
-              {(item.cooked_count || 0) + (likedPosts[item.id] ? 1 : 0)}
-            </Text>
+            <Text style={styles.actionText}>{item.save_count || 0}</Text>
           </TouchableOpacity>
 
           <View style={styles.dividerVertical} />
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push(`/recipe/${item.id}?tab=comments` as any)}
           >

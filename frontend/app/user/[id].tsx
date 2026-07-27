@@ -1,25 +1,61 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, StatusBar, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, StatusBar, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { fetchUserProfile, UserProfileInfo } from '../../services/userService';
+import { fetchUserProfile, UserProfileInfo } from '../../services/user/userService';
+import { followUser, unfollowUser } from '../../services/community/communityService';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfileInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       if (!id) return;
       const data = await fetchUserProfile(id as string);
       setProfile(data);
+      if (data) {
+        setIsFollowing(data.is_following);
+        setFollowerCount(data.follower_count);
+      }
       setLoading(false);
     };
     loadProfile();
   }, [id]);
+
+  const handleToggleFollow = async () => {
+    if (!id || followLoading) return;
+
+    const userId = parseInt(id as string, 10);
+    if (isNaN(userId)) return;
+
+    // Optimistic update: đổi giao diện ngay, rollback nếu API lỗi
+    const previousFollowing = isFollowing;
+    const previousCount = followerCount;
+    setIsFollowing(!previousFollowing);
+    setFollowerCount(previousFollowing ? previousCount - 1 : previousCount + 1);
+    setFollowLoading(true);
+
+    try {
+      if (previousFollowing) {
+        await unfollowUser(userId);
+      } else {
+        await followUser(userId);
+      }
+    } catch (err: any) {
+      setIsFollowing(previousFollowing);
+      setFollowerCount(previousCount);
+      Alert.alert('Thao tác thất bại', err.message || 'Bạn cần đăng nhập để theo dõi người dùng này.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -85,18 +121,39 @@ export default function UserProfileScreen() {
                 <Text style={styles.statLabel}>want to make</Text>
                 <Text style={styles.statValue}>{profile.want_to_make_count}</Text>
               </View>
-              <View style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => router.push({
+                  pathname: '/user/[id]/followers',
+                  params: { id: id as string, name: profile.name, handle: profile.handle, tab: 'followers' },
+                })}
+              >
                 <Text style={styles.statLabel}>followers</Text>
-                <Text style={styles.statValue}>{profile.follower_count}</Text>
-              </View>
+                <Text style={styles.statValue}>{followerCount}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
         {/* Follow Button */}
-        <TouchableOpacity style={styles.followBtn}>
-          <Text style={styles.followBtnText}>Follow</Text>
-        </TouchableOpacity>
+        {!profile.is_self && (
+          <TouchableOpacity
+            style={[styles.followBtn, isFollowing && styles.followingBtn]}
+            onPress={handleToggleFollow}
+            disabled={followLoading}
+          >
+            {followLoading ? (
+              <ActivityIndicator size="small" color={isFollowing ? '#FF5A5F' : '#fff'} />
+            ) : (
+              <>
+                {isFollowing && <Ionicons name="checkmark" size={16} color="#FF5A5F" style={{ marginRight: 4 }} />}
+                <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                  {isFollowing ? 'Đang theo dõi' : 'Follow'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Section: RECENTLY ADDED */}
         <View style={styles.sectionContainer}>
@@ -232,6 +289,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FF5A5F',
     paddingVertical: 10,
     paddingHorizontal: 24,
@@ -239,11 +299,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginLeft: 20,
     marginTop: 16,
+    minWidth: 100,
+  },
+  followingBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#FF5A5F',
   },
   followBtnText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 14,
+  },
+  followingBtnText: {
+    color: '#FF5A5F',
   },
   sectionContainer: {
     marginTop: 32,

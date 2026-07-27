@@ -225,3 +225,29 @@ CREATE INDEX ix_user_tokens_user_id ON public.user_tokens (user_id);
 -- =====================================================================
 -- END OF SCRIPT (17 bang: 3 co san + 14 bang moi)
 -- =====================================================================
+-- 1. Bảng lưu trữ danh sách các thẻ Tag
+CREATE TABLE public.tags (
+    id            serial PRIMARY KEY,
+    name          character varying(50) NOT NULL,
+    slug          character varying(60) NOT NULL,
+    usage_count   integer NOT NULL DEFAULT 0, -- RẤT QUAN TRỌNG: Đếm số lần tag này được sử dụng
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT tags_name_key UNIQUE (name),
+    CONSTRAINT tags_slug_key UNIQUE (slug)
+);
+
+-- Tạo Index trên usage_count để truy vấn "Hashtag nổi bật (Trending)" siêu nhanh
+CREATE INDEX ix_tags_usage_count ON public.tags USING btree (usage_count DESC);
+
+
+-- 2. Bảng trung gian (Pivot Table) nối Recipe và Tag
+CREATE TABLE public.recipe_tags (
+    recipe_id     integer NOT NULL REFERENCES public.recipes(id) ON DELETE CASCADE,
+    tag_id        integer NOT NULL REFERENCES public.tags(id) ON DELETE CASCADE,
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    PRIMARY KEY (recipe_id, tag_id) -- Chống trùng lặp 1 bài viết có 2 tag giống nhau
+);
+
+-- Tạo Index để tối ưu hoá việc tìm kiếm bài viết theo Tag
+CREATE INDEX ix_recipe_tags_tag_id ON public.recipe_tags USING btree (tag_id);
+ALTER TABLE public.users ADD COLUMN follower_count integer NOT NULL DEFAULT 0;

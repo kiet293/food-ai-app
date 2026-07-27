@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { fetchExploreGrid, ExploreGridItem } from '@/services/exploreService';
+import { fetchExploreGrid, ExploreGridItem } from '@/services/recipe/recipeService';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_WIDTH = (width - 44) / 3;

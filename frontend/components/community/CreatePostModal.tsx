@@ -16,8 +16,8 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_HOT_TAGS } from '../../services/mockCommunityData';
-import { fetchCategories, createRecipe } from '../../services/exploreService';
+import { MOCK_HOT_TAGS } from '../../services/mock/mockCommunityData';
+import { fetchCategories, createRecipe } from '../../services/recipe/recipeService';
 
 interface CreatePostModalProps {
   visible: boolean;

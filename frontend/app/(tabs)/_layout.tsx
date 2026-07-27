@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/core/haptic-tab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getToken } from '@/services/authService';
+import { getToken } from '@/services/auth/authService';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

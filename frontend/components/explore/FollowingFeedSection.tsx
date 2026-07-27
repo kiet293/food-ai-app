@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PostItem } from '@/services/mockCommunityData';
+import { PostItem } from '@/services/mock/mockCommunityData';
 
 interface FollowingFeedSectionProps {
   posts: PostItem[];

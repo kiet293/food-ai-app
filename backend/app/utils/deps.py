@@ -1,7 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
+from typing import Optional
 from app.models.database import get_db
 from app.models.user_model import UserDB
 from app.utils.security import SECRET_KEY, ALGORITHM
@@ -30,3 +31,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
         
     return user # Trả về thông tin của người đó
+
+def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[UserDB]:
+    # Giống get_current_user nhưng không bắt buộc đăng nhập (dùng cho API cho phép khách xem)
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id:
+            return db.query(UserDB).filter(UserDB.id == int(user_id)).first()
+    except JWTError:
+        pass
+    return None

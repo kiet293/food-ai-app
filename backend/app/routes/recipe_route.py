@@ -7,11 +7,12 @@ import cloudinary
 import cloudinary.uploader
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from typing import Optional
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, RecipeStatsDB, RatingDB, CommentDB, CategoryDB, RecipeCategoryDB, TagDB, RecipeTagDB
 from app.schemas.recipe import AIAnalysisResult, RateRecipeRequest # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
 from app.models.user_model import UserDB
-from app.utils.deps import get_current_user
+from app.utils.deps import get_current_user, get_optional_current_user
 from app.crud.recipe_stats import record_recipe_save
 from app.utils.response import success_response, CustomException
 import unicodedata
@@ -62,7 +63,7 @@ def delete_image_from_cloudinary(image_url: str):
         print(f"❌ Lỗi khi xóa ảnh cũ trên Cloudinary: {e}")
         # Không throw lỗi để tiến trình cập nhật vẫn tiếp tục dù xóa ảnh cũ thất bại
 
-def format_recipe_summary(recipe: RecipeDB):
+def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = None):
     author_info = None
     if recipe.author:
         author_info = {
@@ -71,10 +72,14 @@ def format_recipe_summary(recipe: RecipeDB):
             "handle": f"@{recipe.author.username}",
             "avatar": recipe.author.avatar
         }
-    
+
     ratings_list = [r.score for r in recipe.ratings] if recipe.ratings else []
     ratings_avg = sum(ratings_list) / len(ratings_list) if ratings_list else 0
-    
+
+    is_favorited = False
+    if current_user and recipe.favorites:
+        is_favorited = any(f.user_id == current_user.id for f in recipe.favorites)
+
     return {
         "id": recipe.id,
         "title": recipe.recipe_name,
@@ -85,10 +90,35 @@ def format_recipe_summary(recipe: RecipeDB):
         "ratings_avg": round(ratings_avg, 1),
         "ratings_count": len(ratings_list),
         "comments_count": len(recipe.comments) if recipe.comments else 0,
-        "save_count": 0, # Tạm thời trả về 0 theo kế hoạch
+        "save_count": len(recipe.favorites) if recipe.favorites else 0,
+        "is_favorited": is_favorited,
         "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
+
+# API LẤY DANH SÁCH TRENDING RECIPES
+@router.get("/trending")
+def get_trending_recipes(limit: int = 10, db: Session = Depends(get_db)):
+    """Lấy danh sách các món ăn đang hot dựa trên trending_score"""
+    try:
+        recipes = db.query(RecipeDB).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
+        
+        results = []
+        for index, recipe in enumerate(recipes):
+            summary = format_recipe_summary(recipe)
+            # Gắn badge cho top 3 món cao điểm nhất
+            if index < 3:
+                summary["badge"] = "Đang Hot 🚀"
+            results.append(summary)
+            
+        return success_response(data=results, message="Lấy danh sách Trending thành công")
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy Trending Recipes: {e}")
+        raise CustomException(
+            message=f"Lỗi hệ thống khi lấy danh sách Trending",
+            code="FETCH_TRENDING_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # API LƯU CÔNG THỨC VÀO SỔ TAY
 @router.post("/save")
@@ -389,20 +419,21 @@ def get_explore_grid(
 def get_explore_feed(
     start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
     limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
         query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
-        
+
         # Lấy từ start_id trở xuống
         if start_id:
             query = query.filter(RecipeDB.id <= start_id)
-            
+
         recipes = query.limit(limit).all()
-        
+
         next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
-        
-        result_list = [format_recipe_summary(r) for r in recipes]
+
+        result_list = [format_recipe_summary(r, current_user) for r in recipes]
         
         return success_response(
             data={

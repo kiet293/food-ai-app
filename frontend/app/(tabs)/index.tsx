@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getUserProfile } from '@/services/authService';
+import { getUserProfile } from '@/services/auth/authService';
 import useRecentSearches from '@/hooks/useRecentSearches';
 import {
   MOCK_COLLECTIONS,
@@ -11,10 +11,10 @@ import {
   MOCK_EXPLORE_GRID,
   MOCK_POSTS,
   PostItem,
-  TrendingRecipeItem,
-} from '@/services/mockCommunityData';
-import { fetchPopularChefs, ChefInfo } from '@/services/exploreService';
-import { fetchHotTags, TagInfo } from '@/services/tagService';
+} from '@/services/mock/mockCommunityData';
+import { fetchPopularChefs, ChefInfo } from '@/services/user/userService';
+import { fetchTrendingRecipes, TrendingRecipeItem } from '@/services/recipe/recipeService';
+import { fetchHotTags, TagInfo } from '@/services/tag/tagService';
 
 // Modular Refactored Components
 import { HomeHeader } from '@/components/explore/HomeHeader';
@@ -91,7 +91,7 @@ export default function HomeScreen() {
 
   const [posts, setPosts] = useState<PostItem[]>(MOCK_POSTS);
   const [chefs, setChefs] = useState<ChefInfo[]>([]);
-  const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>(MOCK_TRENDING_RECIPES);
+  const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>([]);
   const [hotTags, setHotTags] = useState<TagInfo[]>([]);
 
   useEffect(() => {
@@ -103,8 +103,13 @@ export default function HomeScreen() {
       const popularChefs = await fetchPopularChefs();
       if (popularChefs.length > 0) setChefs(popularChefs);
     };
+    const loadTrending = async () => {
+      const trending = await fetchTrendingRecipes();
+      if (trending.length > 0) setTrendingRecipes(trending);
+    };
     loadTags();
     loadChefs();
+    loadTrending();
   }, []);
 
   // Modals state
@@ -172,7 +177,7 @@ export default function HomeScreen() {
     );
   };
 
-  const toggleSaveTrending = (id: string) => {
+  const toggleSaveTrending = (id: string | number) => {
     setTrendingRecipes((prev) =>
       prev.map((t) => (t.id === id ? { ...t, saved: !t.saved } : t))
     );
