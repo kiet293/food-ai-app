@@ -36,7 +36,7 @@ export const fetchReels = async () => {
         }
 
         const resData = await response.json();
-        return resData.data; // Trả về mảng danh sách các Reels
+        return resData.data || [];
     } catch (error) {
         console.error("❌ Lỗi tải Reels từ API:", error);
         return [];

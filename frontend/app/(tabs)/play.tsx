@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { fetchReels, toggleLikeReel, followUser, unfollowUser } from '@/services/reelService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
@@ -23,6 +24,7 @@ const { height } = Dimensions.get('window');
 
 export default function PlayScreen() {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   // Khởi tạo chiều cao
   const [reelHeight, setReelHeight] = useState(height - insets.bottom - 60);
 
@@ -30,6 +32,7 @@ export default function PlayScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [activeReelId, setActiveReelId] = useState<string>('');
+  const [isCurrentVideoPlaying, setIsCurrentVideoPlaying] = useState(true);
 
   // Quản lý trạng thái mở/đóng các Modal tương tác
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
@@ -52,10 +55,10 @@ export default function PlayScreen() {
   useEffect(() => {
     loadReels();
 
-    // Cấu hình chế độ âm thanh toàn hệ thống cho Expo (Cho phép phát âm thanh khi máy bật chế độ im lặng)
     Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
+      shouldDuckAndroid: false,
     }).catch(err => console.log('Audio mode error:', err));
   }, []);
 
@@ -182,7 +185,7 @@ export default function PlayScreen() {
           renderItem={({ item }) => (
             <ReelVideoItem
               item={item}
-              isActive={item.id === activeReelId}
+              isActive={isFocused && item.id === activeReelId}
               isMuted={isMuted}
               reelHeight={reelHeight}
               onToggleMute={toggleMuteAll}
@@ -196,6 +199,7 @@ export default function PlayScreen() {
                 setActiveReelForModal(r);
                 setIsShareModalOpen(true);
               }}
+              onPlayStateChange={(isPlaying) => setIsCurrentVideoPlaying(isPlaying)}
             />
           )}
         />

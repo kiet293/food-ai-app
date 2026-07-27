@@ -183,7 +183,24 @@ def get_reels(
         # Tự động đồng bộ thêm video nấu ăn từ Pexels API
         sync_pexels_cooking_videos(db)
         
-        reels = db.query(ReelDB).order_by(ReelDB.created_at.desc()).all()
+        # 1. Nếu có người dùng đăng nhập, lấy video do CHÍNH người dùng này đăng tải lên vị trí ĐẦU TIÊN (#1)
+        my_reels = []
+        if current_user:
+            my_reels = db.query(ReelDB).filter(ReelDB.user_id == current_user.id).order_by(ReelDB.created_at.desc()).all()
+
+        my_reel_ids = [r.id for r in my_reels]
+
+        # 2. Lấy các video của người dùng thật khác (không phải Pexels và chưa gồm my_reels)
+        other_user_reels = db.query(ReelDB).join(UserDB).filter(
+            ~UserDB.username.startswith("pexels_user_"),
+            ~ReelDB.id.in_(my_reel_ids) if my_reel_ids else True
+        ).order_by(ReelDB.created_at.desc()).all()
+
+        # 3. Các video nạp tự động từ Pexels xếp nối tiếp phía sau
+        pexels_reels = db.query(ReelDB).join(UserDB).filter(UserDB.username.startswith("pexels_user_")).order_by(ReelDB.created_at.desc()).all()
+
+        # Thứ tự ưu tiên: Video chính chủ -> Video người dùng thật khác -> Video Pexels
+        reels = my_reels + other_user_reels + pexels_reels
         
         result_list = []
         for reel in reels:
@@ -222,6 +239,7 @@ def get_reels(
             result_list.append({
                 "id": f"reel-{reel.id}",
                 "db_id": reel.id,
+                "isPexels": reel.author.username.startswith("pexels_user_"),
                 "author": {
                     "id": f"user-{reel.author.id}",
                     "name": reel.author.full_name or reel.author.username,
