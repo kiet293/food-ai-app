@@ -79,11 +79,16 @@ export const getUserProfile = async () => {
     }
 };
 
-// HÀM CẬP NHẬT THÔNG TIN CÁ NHÂN
-export const updateUserProfile = async (fullName: String, avatar: String) => {
+// HÀM CẬP NHẬT THÔNG TIN CÁ NHÂN (Tên, Avatar, Bio)
+export const updateUserProfile = async (fullName?: string, avatar?: string, bio?: string) => {
     try {
         const token = await getToken();
         if (!token) throw new Error("Chưa đăng nhập");
+
+        const bodyData: any = {};
+        if (fullName !== undefined) bodyData.full_name = fullName;
+        if (avatar !== undefined) bodyData.avatar = avatar;
+        if (bio !== undefined) bodyData.bio = bio;
 
         const response = await fetch(`${AUTH_URL}/me/update`, {
             method: 'PUT',
@@ -91,10 +96,7 @@ export const updateUserProfile = async (fullName: String, avatar: String) => {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                full_name: fullName,
-                avatar: avatar
-            })
+            body: JSON.stringify(bodyData)
         });
 
         if (!response.ok) throw new Error("Không thể cập nhật thông tin");

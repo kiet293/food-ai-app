@@ -103,7 +103,7 @@ def get_my_profile(
             "username": current_user.username,
             "full_name": current_user.full_name or current_user.username,
             "avatar": current_user.avatar or "👨‍🍳",
-            "bio": "Yêu bếp & Sáng tạo công thức nấu ăn cùng Food AI 🍳✨",
+            "bio": current_user.bio if current_user.bio is not None else "",
             "status_badge": "Tám chuyện nào 💬",
             "following_count": following_count,
             "follower_count": follower_count,
@@ -119,6 +119,7 @@ def get_my_profile(
             "username": current_user.username,
             "full_name": current_user.full_name or current_user.username,
             "avatar": current_user.avatar or "👨‍🍳",
+            "bio": "",
             "following_count": 0,
             "follower_count": 0,
             "total_likes_count": 0,
@@ -137,6 +138,10 @@ def update_profile(
     # Cập nhật tên hiển thị nếu có gửi lên
     if update_data.full_name is not None:
         current_user.full_name = update_data.full_name
+
+    # Cập nhật tiểu sử nếu có gửi lên
+    if update_data.bio is not None:
+        current_user.bio = update_data.bio
 
     # Cập nhật avatar nếu có gửi lên
     if update_data.avatar is not None:
