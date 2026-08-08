@@ -1,5 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, StatusBar, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { fetchUserProfile, UserProfileInfo } from '../../services/user/userService';
 import { followUser, unfollowUser } from '../../services/community/communityService';
@@ -21,10 +22,10 @@ export default function UserProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
-  
+
   const [activeTab, setActiveTab] = useState<ProfileTabType>('posted');
   const isDarkMode = false; // Mặc định sáng cho đồng nhất
-  
+
   const dynamicBg = '#ffffff';
   const dynamicTextColor = '#000000';
   const dynamicSubTextColor = '#666666';
@@ -87,7 +88,7 @@ export default function UserProfileScreen() {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicBg }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ProfileHeader 
+        <ProfileHeader
           fullName="Không tìm thấy"
           dynamicTextColor={dynamicTextColor}
           dynamicBorderColor={dynamicBorderColor}
@@ -106,7 +107,7 @@ export default function UserProfileScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="dark-content" backgroundColor={dynamicBg} />
 
-      <ProfileHeader 
+      <ProfileHeader
         fullName={profile.name}
         dynamicTextColor={dynamicTextColor}
         dynamicBorderColor={dynamicBorderColor}

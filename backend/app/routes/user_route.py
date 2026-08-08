@@ -4,8 +4,9 @@ from typing import List, Optional
 
 from app.models.database import get_db
 from app.models.user_model import UserDB, FollowDB
-from app.models.recipe_model import RecipeDB, CollectionDB, CollectionRecipeDB, FavoriteDB
+from app.models.recipe_model import RecipeDB, FavoriteDB
 from app.models.reel_model import ReelDB, ReelLikeDB
+from app.models.collection_model import CollectionDB, CollectionRecipeDB
 from app.schemas.user import ChefResponse
 from app.utils.deps import get_optional_current_user
 from app.utils.response import success_response, CustomException

@@ -1,3 +1,4 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import { useRouter } from 'expo-router';
 import {
@@ -7,7 +8,7 @@ import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
+  
   ScrollView,
   StatusBar,
   StyleSheet,

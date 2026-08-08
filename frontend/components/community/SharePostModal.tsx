@@ -7,28 +7,48 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 
 interface SharePostModalProps {
   visible: boolean;
   onClose: () => void;
   postTitle?: string;
+  recipeId?: string | number;
 }
 
 export const SharePostModal: React.FC<SharePostModalProps> = ({
   visible,
   onClose,
   postTitle,
+  recipeId,
 }) => {
-  const handleCopyLink = () => {
-    Alert.alert('Thành công 🎉', 'Đã sao chép liên kết bài viết!');
-    onClose();
+  const getShareUrl = () => {
+    return `https://foodai.app/recipe/${recipeId || ''}`;
   };
 
-  const handleShareApp = (platform: string) => {
-    Alert.alert('Chia sẻ', `Đang chia sẻ "${postTitle}" qua ${platform}...`);
-    onClose();
+  const handleCopyLink = async () => {
+    try {
+      await Clipboard.setStringAsync(getShareUrl());
+      Alert.alert('Thành công 🎉', 'Đã sao chép liên kết bài viết!');
+      onClose();
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể sao chép liên kết.');
+    }
+  };
+
+  const handleShareApp = async (platform?: string) => {
+    try {
+      await Share.share({
+        message: `Cùng xem công thức "${postTitle}" cực ngon trên FoodAI nhé! \nLink: ${getShareUrl()}`,
+        url: getShareUrl(),
+      });
+      onClose();
+    } catch (error: any) {
+      Alert.alert('Lỗi chia sẻ', error.message);
+    }
   };
 
   return (
