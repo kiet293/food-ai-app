@@ -14,6 +14,7 @@ class UserDB(Base):
     full_name = Column(String, nullable = True)
 
     avatar = Column(String, default="👨‍🍳")
+    bio = Column(String, nullable=True)
     
     is_admin = Column(Boolean, default=False)
     

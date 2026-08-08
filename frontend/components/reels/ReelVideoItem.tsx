@@ -8,9 +8,11 @@ import {
   Pressable,
   ActivityIndicator,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, Audio } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +20,7 @@ const { width } = Dimensions.get('window');
 export interface ReelItem {
   id: string;
   db_id?: number;
+  isPexels?: boolean;
   author: {
     id: string;
     name: string;
@@ -34,6 +37,7 @@ export interface ReelItem {
   isSaved?: boolean;
   sharesCount: number;
   musicTrack: string;
+  audioUrl?: string;
   recipe?: {
     id: number;
     title: string;
@@ -52,6 +56,7 @@ interface ReelVideoItemProps {
   toggleFollow: (id: string) => void;                // Hàm theo dõi tác giả
   onOpenComments: (item: ReelItem) => void;          // Mở modal bình luận
   onOpenShare: (item: ReelItem) => void;             // Mở modal chia sẻ
+  onPlayStateChange?: (isPlaying: boolean) => void;   // Báo trạng thái phát/dừng về component cha
 }
 
 export default function ReelVideoItem({
@@ -64,10 +69,41 @@ export default function ReelVideoItem({
   toggleFollow,
   onOpenComments,
   onOpenShare,
+  onPlayStateChange,
 }: ReelVideoItemProps) {
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<any>({});
   const [isPlaying, setIsPlaying] = useState(true);
+
+  // Animation xoay đĩa nhạc kiểu TikTok
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+    if (isActive && isPlaying) {
+      spinValue.setValue(0);
+      animation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      animation.start();
+    } else {
+      spinValue.stopAnimation();
+    }
+
+    return () => {
+      if (animation) animation.stop();
+    };
+  }, [isActive, isPlaying]);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Hook useEffect tự động điều khiển phát/dừng video dựa trên trạng thái isActive (đang xem)
   useEffect(() => {
@@ -75,6 +111,7 @@ export default function ReelVideoItem({
       if (isActive) {
         videoRef.current.playAsync(); // Tự động phát khi trượt đến video này
         setIsPlaying(true);
+        if (onPlayStateChange) onPlayStateChange(true);
       } else {
         videoRef.current.stopAsync(); // Tự động dừng khi trượt qua video khác
         setIsPlaying(false);
@@ -85,12 +122,16 @@ export default function ReelVideoItem({
   // Tạm dừng hoặc Phát tiếp
   const handlePlayPause = () => {
     if (videoRef.current) {
+      const nextState = !isPlaying;
       if (isPlaying) {
         videoRef.current.pauseAsync();
       } else {
         videoRef.current.playAsync();
       }
-      setIsPlaying(!isPlaying);
+      setIsPlaying(nextState);
+      if (onPlayStateChange) {
+        onPlayStateChange(nextState);
+      }
     }
   };
 
@@ -106,7 +147,7 @@ export default function ReelVideoItem({
             resizeMode={ResizeMode.COVER}
             isLooping
             isMuted={isMuted}
-            shouldPlay={isActive}
+            shouldPlay={isActive && isPlaying}
             onPlaybackStatusUpdate={(s) => setStatus(() => s)}
             onError={(error) => console.log('Video Playback Error:', error)}
           />
@@ -206,9 +247,9 @@ export default function ReelVideoItem({
         </TouchableOpacity>
 
         {/* Đĩa nhạc xoay */}
-        <View style={styles.audioDisc}>
+        <Animated.View style={[styles.audioDisc, { transform: [{ rotate: spin }] }]}>
           <Image source={{ uri: item.author.avatar }} style={styles.discImg} />
-        </View>
+        </Animated.View>
       </View>
 
       {/* Lớp thông tin phủ ở góc dưới bên trái */}
