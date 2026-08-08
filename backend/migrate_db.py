@@ -24,5 +24,6 @@ run_sql("CREATE INDEX IF NOT EXISTS ix_ratings_recipe_id ON ratings (recipe_id);
 run_sql("CREATE INDEX IF NOT EXISTS ix_ratings_user_id ON ratings (user_id);")
 run_sql("CREATE INDEX IF NOT EXISTS ix_comments_recipe_id ON comments (recipe_id);")
 run_sql("CREATE INDEX IF NOT EXISTS ix_comments_user_id ON comments (user_id);")
+run_sql("ALTER TABLE collections ADD COLUMN IF NOT EXISTS cover_image VARCHAR;")
 
 print("Database migration completed successfully!")

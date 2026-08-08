@@ -7,7 +7,7 @@ interface ProfileAvatarSectionProps {
   username: string;
   statusBadge?: string;
   dynamicSubTextColor: string;
-  onEditAvatarPress: () => void;
+  onEditAvatarPress?: () => void;
 }
 
 export const ProfileAvatarSection: React.FC<ProfileAvatarSectionProps> = ({
@@ -27,16 +27,23 @@ export const ProfileAvatarSection: React.FC<ProfileAvatarSectionProps> = ({
       </View>
 
       {/* Avatar Circle */}
-      <TouchableOpacity style={styles.avatarWrapper} onPress={onEditAvatarPress} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={styles.avatarWrapper} 
+        onPress={onEditAvatarPress} 
+        disabled={!onEditAvatarPress}
+        activeOpacity={onEditAvatarPress ? 0.8 : 1}
+      >
         {isUrl(avatar) ? (
           <Image source={{ uri: avatar }} style={styles.avatarImage} />
         ) : (
           <Text style={styles.avatarEmoji}>{avatar || '👨‍🍳'}</Text>
         )}
         {/* Plus Story Badge */}
-        <View style={styles.plusStoryBadge}>
-          <Ionicons name="add" size={16} color="#fff" />
-        </View>
+        {onEditAvatarPress && (
+          <View style={styles.plusStoryBadge}>
+            <Ionicons name="add" size={16} color="#fff" />
+          </View>
+        )}
       </TouchableOpacity>
 
       {/* Username Handle */}

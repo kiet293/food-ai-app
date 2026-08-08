@@ -27,6 +27,7 @@ export default function UserProfileScreen() {
   const isDarkMode = false; // Mặc định sáng cho đồng nhất
 
   const dynamicBg = '#ffffff';
+  const dynamicCardBg = '#f8f9fa';
   const dynamicTextColor = '#000000';
   const dynamicSubTextColor = '#666666';
   const dynamicBorderColor = '#eeeeee';
@@ -172,7 +173,10 @@ export default function UserProfileScreen() {
           reelsList={profile.my_reels || []}
           savedRecipesList={profile.collections || []}
           likedReelsList={profile.liked_reels || []}
-          isDarkMode={isDarkMode}
+          dynamicTextColor={dynamicTextColor}
+          dynamicSubTextColor={dynamicSubTextColor}
+          dynamicCardBg={dynamicCardBg}
+          onNavigateToPlay={() => router.push('/play')}
         />
       </ScrollView>
     </SafeAreaView>

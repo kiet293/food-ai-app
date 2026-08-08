@@ -58,18 +58,18 @@ def seed_data():
         # 3. Tao Reels mau lien ket voi cac cong thuc vua tao
         reels_data = [
             {
-                "caption": "Bi quyet lam sot Pho Mai tan chay sieu beo ngay cho mon Pasta ngon ngat ngay! #Cheesy #Pasta #FoodHack",
-                "video_url": "https://vjs.zencdn.net/v/oceans.mp4",
+                "caption": "Bí quyết làm sốt Phô Mai tan chảy siêu béo ngậy cho món Pasta ngon ngất ngây! 🍝 #Cheesy #Pasta #FoodHack",
+                "video_url": "https://assets.mixkit.co/videos/preview/mixkit-pouring-hot-sauce-on-meat-42284-large.mp4",
                 "recipe_id": recipe_ids[0]
             },
             {
-                "caption": "Cach uop Bit Tet mem mong giu tron vi ngot tu nhien chi trong 5 phut! #SteakLover #CookingTips",
-                "video_url": "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4",
+                "caption": "Cách cắt thái rau củ chuẩn đầu bếp chuyên nghiệp chi tiết trong 5 phút! 🔪 #SteakLover #CookingTips",
+                "video_url": "https://assets.mixkit.co/videos/preview/mixkit-chef-cutting-vegetables-in-a-kitchen-40503-large.mp4",
                 "recipe_id": recipe_ids[1]
             },
             {
-                "caption": "Banh Souffle Socola tan chay gion vo ngoai mem mong ben trong ngot ngao #BakingLove #DessertTime",
-                "video_url": "https://vjs.zencdn.net/v/oceans.mp4",
+                "caption": "Bánh Pizza phô mai nóng hổi tan chảy thơm lừng cuốn hút 🍕 #PizzaTime #FoodPorn",
+                "video_url": "https://assets.mixkit.co/videos/preview/mixkit-tasty-freshly-baked-pizza-being-sliced-42289-large.mp4",
                 "recipe_id": recipe_ids[2]
             }
         ]
