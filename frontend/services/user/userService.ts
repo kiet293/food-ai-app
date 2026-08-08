@@ -6,9 +6,12 @@ export interface UserProfileInfo {
   name: string;
   handle: string;
   avatar: string;
+  bio?: string;
   made_count: number;
   want_to_make_count: number;
+  following_count: number;
   follower_count: number;
+  total_likes_count: number;
   is_following: boolean;
   is_self: boolean;
   recent_recipes: {
@@ -22,6 +25,8 @@ export interface UserProfileInfo {
     count: number;
     image: string;
   }[];
+  my_reels?: any[];
+  liked_reels?: any[];
 }
 
 export const fetchUserProfile = async (userId: string): Promise<UserProfileInfo | null> => {

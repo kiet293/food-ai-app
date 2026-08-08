@@ -6,8 +6,10 @@ interface ProfileHeaderProps {
   fullName: string;
   dynamicTextColor: string;
   dynamicBorderColor: string;
-  onOpenEditModal: () => void;
-  onOpenSettings: () => void;
+  onOpenEditModal?: () => void;
+  onOpenSettings?: () => void;
+  showBackButton?: boolean;
+  onBackPress?: () => void;
 }
 
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -16,24 +18,42 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   dynamicBorderColor,
   onOpenEditModal,
   onOpenSettings,
+  showBackButton = false,
+  onBackPress,
 }) => {
   return (
     <View style={[styles.topHeader, { borderBottomColor: dynamicBorderColor }]}>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenEditModal}>
-        <Ionicons name="create-outline" size={24} color={dynamicTextColor} />
-      </TouchableOpacity>
+      {showBackButton ? (
+        <TouchableOpacity style={styles.iconBtn} onPress={onBackPress}>
+          <Ionicons name="chevron-back" size={28} color={dynamicTextColor} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.iconBtn} onPress={onOpenEditModal}>
+          <Ionicons name="create-outline" size={24} color={dynamicTextColor} />
+        </TouchableOpacity>
+      )}
 
-      <TouchableOpacity style={styles.headerTitleBox} onPress={onOpenEditModal}>
+      <TouchableOpacity 
+        style={styles.headerTitleBox} 
+        onPress={showBackButton ? undefined : onOpenEditModal}
+        activeOpacity={showBackButton ? 1 : 0.2}
+      >
         <Text style={[styles.headerTitle, { color: dynamicTextColor }]} numberOfLines={1}>
-          {fullName || 'Gia Kiệt'}
+          {fullName || 'Người dùng'}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={dynamicTextColor} style={{ marginLeft: 4 }} />
+        {!showBackButton && (
+          <Ionicons name="chevron-down" size={16} color={dynamicTextColor} style={{ marginLeft: 4 }} />
+        )}
       </TouchableOpacity>
 
       <View style={styles.rightIconsRow}>
-        <TouchableOpacity style={styles.iconBtn} onPress={onOpenSettings}>
-          <Ionicons name="menu-outline" size={28} color={dynamicTextColor} />
-        </TouchableOpacity>
+        {!showBackButton ? (
+          <TouchableOpacity style={styles.iconBtn} onPress={onOpenSettings}>
+            <Ionicons name="menu-outline" size={28} color={dynamicTextColor} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 28 }} /> /* Spacer để căn giữa tiêu đề khi có nút back */
+        )}
       </View>
     </View>
   );

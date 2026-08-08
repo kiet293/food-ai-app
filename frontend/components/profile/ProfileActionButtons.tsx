@@ -6,9 +6,12 @@ interface ProfileActionButtonsProps {
   isDarkMode: boolean;
   dynamicTextColor: string;
   dynamicSubTextColor: string;
-  onOpenEditModal: () => void;
-  onOpenBioModal: () => void;
-  onShareProfile: () => void;
+  onOpenEditModal?: () => void;
+  onOpenBioModal?: () => void;
+  onShareProfile?: () => void;
+  isSelfProfile?: boolean;
+  isFollowing?: boolean;
+  onToggleFollow?: () => void;
 }
 
 export const ProfileActionButtons: React.FC<ProfileActionButtonsProps> = ({
@@ -19,43 +22,71 @@ export const ProfileActionButtons: React.FC<ProfileActionButtonsProps> = ({
   onOpenEditModal,
   onOpenBioModal,
   onShareProfile,
+  isSelfProfile = true,
+  isFollowing = false,
+  onToggleFollow,
 }) => {
   const hasBio = bio && bio.trim().length > 0;
 
   return (
     <View style={styles.actionButtonsSection}>
-      {/* 1. Hiển thị Tiểu sử nếu đã có, bấm vào để sửa/xóa (TikTok Style) */}
+      {/* 1. Hiển thị Tiểu sử */}
       {hasBio ? (
-        <TouchableOpacity style={styles.bioTextWrapper} onPress={onOpenBioModal} activeOpacity={0.7}>
+        <TouchableOpacity 
+          style={styles.bioTextWrapper} 
+          onPress={isSelfProfile ? onOpenBioModal : undefined} 
+          activeOpacity={isSelfProfile ? 0.7 : 1}
+        >
           <Text style={[styles.bioDisplayText, { color: dynamicTextColor }]} numberOfLines={3}>
             {bio}
           </Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity
-          style={[styles.addBioPill, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f8f9fa' }]}
-          onPress={onOpenBioModal}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.addBioText, { color: dynamicSubTextColor }]}>+ Thêm tiểu sử</Text>
-        </TouchableOpacity>
+        isSelfProfile && (
+          <TouchableOpacity
+            style={[styles.addBioPill, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f8f9fa' }]}
+            onPress={onOpenBioModal}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.addBioText, { color: dynamicSubTextColor }]}>+ Thêm tiểu sử</Text>
+          </TouchableOpacity>
+        )
       )}
 
-      {/* 2. Hàng nút Hành động (Chỉnh sửa hồ sơ / Chia sẻ hồ sơ) */}
+      {/* 2. Hàng nút Hành động */}
       <View style={styles.buttonsRow}>
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f1f2f5' }]}
-          onPress={onOpenEditModal}
-        >
-          <Text style={[styles.actionBtnText, { color: dynamicTextColor }]}>Chỉnh sửa hồ sơ</Text>
-        </TouchableOpacity>
+        {isSelfProfile ? (
+          <>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f1f2f5' }]}
+              onPress={onOpenEditModal}
+            >
+              <Text style={[styles.actionBtnText, { color: dynamicTextColor }]}>Chỉnh sửa hồ sơ</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f1f2f5' }]}
-          onPress={onShareProfile}
-        >
-          <Text style={[styles.actionBtnText, { color: dynamicTextColor }]}>Chia sẻ hồ sơ</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: isDarkMode ? '#2c2c2c' : '#f1f2f5' }]}
+              onPress={onShareProfile}
+            >
+              <Text style={[styles.actionBtnText, { color: dynamicTextColor }]}>Chia sẻ hồ sơ</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.actionBtn, 
+              { backgroundColor: isFollowing ? (isDarkMode ? '#2c2c2c' : '#f1f2f5') : '#fe2c55' }
+            ]}
+            onPress={onToggleFollow}
+          >
+            <Text style={[
+              styles.actionBtnText, 
+              { color: isFollowing ? dynamicTextColor : '#fff' }
+            ]}>
+              {isFollowing ? 'Đang follow' : 'Follow'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
