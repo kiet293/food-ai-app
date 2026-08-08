@@ -17,6 +17,7 @@ class RecipeDB(Base):
     comments = relationship("CommentDB", backref="recipe", cascade="all, delete-orphan")
     ratings = relationship("RatingDB", backref="recipe", cascade="all, delete-orphan")
     favorites = relationship("FavoriteDB", backref="recipe", cascade="all, delete-orphan")
+    collection_associations = relationship("CollectionRecipeDB", back_populates="recipe", cascade="all, delete-orphan")
 
     # Tên món ăn
     recipe_name = Column(String, index=True)
@@ -130,30 +131,6 @@ class RecipeTagDB(Base):
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-class CollectionDB(Base):
-    __tablename__ = "collections"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    name = Column(String(150), nullable=False)
-    is_public = Column(Boolean, default=True) # use boolean or integer
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    recipes = relationship("CollectionRecipeDB", back_populates="collection", cascade="all, delete-orphan")
-
-class CollectionRecipeDB(Base):
-    __tablename__ = "collection_recipes"
-    __table_args__ = (UniqueConstraint('collection_id', 'recipe_id', name='uq_collection_recipe'),)
-
-    id = Column(Integer, primary_key=True, index=True)
-    collection_id = Column(Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False, index=True)
-    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    collection = relationship("CollectionDB", back_populates="recipes")
-    recipe = relationship("RecipeDB")
 
 class FavoriteDB(Base):
     __tablename__ = "favorites"

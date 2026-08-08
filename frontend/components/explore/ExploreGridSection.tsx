@@ -6,7 +6,7 @@ import { fetchExploreGrid, ExploreGridItem } from '@/services/recipe/recipeServi
 const { width } = Dimensions.get('window');
 const GRID_ITEM_WIDTH = (width - 44) / 3;
 
-export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refreshTrigger = 0 }) => {
+export const ExploreGridSection: React.FC<{ refreshTrigger?: number, selectedTag?: string }> = ({ refreshTrigger = 0, selectedTag = 'Tất Cả' }) => {
   const router = useRouter();
   const [data, setData] = useState<ExploreGridItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -17,7 +17,7 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refr
     if (isLoading || !hasMore) return;
     setIsLoading(true);
     
-    const response = await fetchExploreGrid(cursor, 18);
+    const response = await fetchExploreGrid(cursor, 18, selectedTag);
     
     setData(prev => [...prev, ...response.items]);
     if (response.next_cursor) {
@@ -31,7 +31,7 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refr
 
   const refresh = async () => {
     setIsLoading(true);
-    const response = await fetchExploreGrid(null, 18);
+    const response = await fetchExploreGrid(null, 18, selectedTag);
     setData(response.items);
     if (response.next_cursor) {
       setCursor(response.next_cursor);
@@ -50,8 +50,8 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number }> = ({ refr
   }, [refreshTrigger]);
 
   useEffect(() => {
-    loadMore();
-  }, []);
+    refresh();
+  }, [selectedTag]);
 
   const renderItem = ({ item, index }: { item: ExploreGridItem, index: number }) => (
     <TouchableOpacity 

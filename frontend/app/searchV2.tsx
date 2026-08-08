@@ -1,6 +1,7 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 ﻿import React, { useEffect, useState } from "react";
 import {
-  SafeAreaView,
+  
   StatusBar,
   StyleSheet,
   Text,
@@ -15,7 +16,7 @@ import {
   TouchableOpacity,
   Alert,
   Keyboard,
-} from "react-native";
+} from 'react-native';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { searchRecipes, AIAnalysisResult } from "../services/ai/aiService";

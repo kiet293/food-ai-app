@@ -1,6 +1,7 @@
 from app.models.database import engine, SessionLocal
 from app.models.user_model import UserDB
-from app.models.recipe_model import RecipeDB, CollectionDB, CollectionRecipeDB
+from app.models.recipe_model import RecipeDB
+from app.models.collection_model import CollectionDB, CollectionRecipeDB
 
 def seed_data():
     db = SessionLocal()

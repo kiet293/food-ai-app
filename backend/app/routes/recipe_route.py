@@ -80,9 +80,14 @@ def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = Non
     if current_user and recipe.favorites:
         is_favorited = any(f.user_id == current_user.id for f in recipe.favorites)
 
+    is_in_collection = False
+    if current_user and recipe.collection_associations:
+        is_in_collection = any(assoc.collection and assoc.collection.user_id == current_user.id for assoc in recipe.collection_associations)
+
     return {
         "id": recipe.id,
         "title": recipe.recipe_name,
+        "description": recipe.description,
         "image": recipe.image_url,
         "cook_time_minutes": recipe.cook_time_minutes,
         "difficulty": recipe.difficulty,
@@ -92,20 +97,25 @@ def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = Non
         "comments_count": len(recipe.comments) if recipe.comments else 0,
         "save_count": len(recipe.favorites) if recipe.favorites else 0,
         "is_favorited": is_favorited,
+        "is_in_collection": is_in_collection,
         "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
 
 # API LẤY DANH SÁCH TRENDING RECIPES
 @router.get("/trending")
-def get_trending_recipes(limit: int = 10, db: Session = Depends(get_db)):
+def get_trending_recipes(
+    limit: int = 10, 
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
     """Lấy danh sách các món ăn đang hot dựa trên trending_score"""
     try:
         recipes = db.query(RecipeDB).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
         
         results = []
         for index, recipe in enumerate(recipes):
-            summary = format_recipe_summary(recipe)
+            summary = format_recipe_summary(recipe, current_user)
             # Gắn badge cho top 3 món cao điểm nhất
             if index < 3:
                 summary["badge"] = "Đang Hot 🚀"
@@ -374,11 +384,20 @@ def get_categories(db: Session = Depends(get_db)):
 def get_explore_grid(
     cursor: int = Query(None, description="ID của công thức cuối cùng ở lần tải trước"),
     limit: int = Query(18, ge=1, le=50, description="Số lượng ảnh cần lấy"),
+    tag: Optional[str] = Query(None, description="Tên tag để lọc"),
     db: Session = Depends(get_db)
 ):
     try:
         # Sắp xếp mới nhất lên đầu (dựa vào ID giảm dần cho nhanh và chính xác)
-        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        query = db.query(RecipeDB)
+        
+        if tag and tag != "Tất Cả":
+            tag_slug = slugify(tag)
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
         
         # Nếu có cursor, chỉ lấy các bài viết cũ hơn bài viết có ID = cursor
         if cursor:
@@ -419,11 +438,20 @@ def get_explore_grid(
 def get_explore_feed(
     start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
     limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
+    tag: Optional[str] = Query(None, description="Tên tag để lọc (tùy chọn)"),
     db: Session = Depends(get_db),
     current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
-        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        query = db.query(RecipeDB)
+        
+        if tag:
+            tag_slug = slugify(tag.replace('#', '')) # Remove # if present
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
 
         # Lấy từ start_id trở xuống
         if start_id:
@@ -449,10 +477,67 @@ def get_explore_feed(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# ====================================================================================================
+# API FOLLOWING FEED (Sử dụng Cursor-based pagination, chỉ lấy công thức từ người dùng đã follow)
+# ====================================================================================================
+@router.get("/following-feed")
+def get_following_feed(
+    start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
+    limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
+    tag: Optional[str] = Query(None, description="Tên tag để lọc (tùy chọn)"),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        from app.models.user_model import FollowDB
+        query = db.query(RecipeDB).join(
+            FollowDB, 
+            RecipeDB.user_id == FollowDB.following_id
+        ).filter(
+            FollowDB.follower_id == current_user.id
+        )
+        
+        if tag:
+            tag_slug = slugify(tag.replace('#', '')) # Remove # if present
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
+
+        # Lấy từ start_id trở xuống
+        if start_id:
+            query = query.filter(RecipeDB.id <= start_id)
+
+        recipes = query.limit(limit).all()
+
+        next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
+
+        result_list = [format_recipe_summary(r, current_user) for r in recipes]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy following feed: {str(e)}")
+        raise CustomException(
+            message=f"Lỗi khi lấy danh sách following feed: {str(e)}",
+            code="FOLLOWING_FEED_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 
 # API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
 @router.get("/{recipe_id}")
-def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
+def get_recipe_details(
+    recipe_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
     try:
         # Tìm công thức trong DB
         recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
@@ -464,7 +549,7 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
             )
         
         # Sử dụng hàm hỗ trợ để lấy các trường cơ bản
-        recipe_data = format_recipe_summary(recipe)
+        recipe_data = format_recipe_summary(recipe, current_user)
         
         # Bổ sung thêm các trường chi tiết (description, ingredients, instructions, servings)
         recipe_data["description"] = recipe.description

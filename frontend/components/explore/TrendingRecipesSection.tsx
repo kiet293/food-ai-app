@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { TrendingRecipeItem } from '@/services/recipe/recipeService';
 
 interface TrendingRecipesSectionProps {
@@ -13,6 +14,8 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
   trendingRecipes,
   toggleSaveTrending,
 }) => {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
@@ -24,7 +27,12 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
         contentContainerStyle={styles.trendingScroll}
       >
         {trendingRecipes.map((recipe) => (
-          <TouchableOpacity key={recipe.id} style={styles.trendingCard}>
+          <TouchableOpacity 
+            key={recipe.id} 
+            style={styles.trendingCard}
+            onPress={() => router.push(`/recipe/${recipe.id}` as any)}
+            activeOpacity={0.9}
+          >
             <Image source={{ uri: recipe.image }} style={styles.trendingImage} />
             <View style={styles.trendingOverlay} />
 

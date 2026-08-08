@@ -44,7 +44,17 @@ export const fetchCategories = async (): Promise<CategoryItem[]> => {
 
 export const fetchTrendingRecipes = async (limit: number = 10): Promise<TrendingRecipeItem[]> => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/recipes/trending?limit=${limit}`);
+    const API_BASE_URL = getApiBaseUrl();
+    const token = await getToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/recipes/trending?limit=${limit}`, {
+      method: 'GET',
+      headers,
+    });
     const data = await response.json();
     if (data.status === 'success') {
       // Map về cấu trúc của TrendingRecipeItem để UI dễ hiển thị
@@ -55,7 +65,7 @@ export const fetchTrendingRecipes = async (limit: number = 10): Promise<Trending
         image: item.image,
         badge: item.badge,
         cookTime: item.cook_time_minutes ? `${item.cook_time_minutes} phút` : '30 phút',
-        saved: false,
+        saved: item.is_in_collection || false,
         savesCount: item.save_count || 0,
       }));
     }
@@ -89,13 +99,16 @@ export interface ExploreGridResponse {
   next_cursor: number | null;
 }
 
-export const fetchExploreGrid = async (cursor: number | null = null, limit: number = 18): Promise<ExploreGridResponse> => {
+export const fetchExploreGrid = async (cursor: number | null = null, limit: number = 18, tag?: string): Promise<ExploreGridResponse> => {
   try {
     const queryParams = new URLSearchParams({
       limit: limit.toString()
     });
     if (cursor !== null) {
       queryParams.append('cursor', cursor.toString());
+    }
+    if (tag && tag !== 'Tất Cả') {
+      queryParams.append('tag', tag);
     }
 
     const API_BASE_URL = getApiBaseUrl();
@@ -122,6 +135,7 @@ export const fetchExploreGrid = async (cursor: number | null = null, limit: numb
 export interface ExploreFeedItem {
   id: number;
   title: string;
+  description?: string | null;
   image: string;
   cook_time_minutes: number | null;
   difficulty: string | null;
@@ -131,6 +145,7 @@ export interface ExploreFeedItem {
   comments_count: number;
   save_count: number;
   is_favorited: boolean;
+  is_in_collection?: boolean;
   cooked_count: number;
   created_at: string | null;
 }
@@ -140,13 +155,16 @@ export interface ExploreFeedResponse {
   next_cursor: number | null;
 }
 
-export const fetchExploreFeed = async (startId: number | null = null, limit: number = 5): Promise<ExploreFeedResponse> => {
+export const fetchExploreFeed = async (startId: number | null = null, limit: number = 5, tag: string | null = null): Promise<ExploreFeedResponse> => {
   try {
     const queryParams = new URLSearchParams({
       limit: limit.toString()
     });
     if (startId !== null) {
       queryParams.append('start_id', startId.toString());
+    }
+    if (tag) {
+      queryParams.append('tag', tag);
     }
 
     const API_RECIPES = `${getApiBaseUrl()}/recipes`;
@@ -169,6 +187,46 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
     return json.data || { items: [], next_cursor: null };
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách explore-feed:", error);
+    return { items: [], next_cursor: null };
+  }
+};
+
+export const fetchFollowingFeed = async (startId: number | null = null, limit: number = 5, tag: string | null = null): Promise<ExploreFeedResponse> => {
+  try {
+    const queryParams = new URLSearchParams({
+      limit: limit.toString()
+    });
+    if (startId !== null) {
+      queryParams.append('start_id', startId.toString());
+    }
+    if (tag) {
+      queryParams.append('tag', tag);
+    }
+
+    const API_RECIPES = `${getApiBaseUrl()}/recipes`;
+    const token = await getToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Following feed requires authentication
+      return { items: [], next_cursor: null };
+    }
+
+    const response = await fetch(`${API_RECIPES}/following-feed?${queryParams.toString()}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Server following-feed đang lỗi: ${errText}`);
+    }
+
+    const json = await response.json();
+    return json.data || { items: [], next_cursor: null };
+  } catch (error) {
+    console.error("❌ Lỗi lấy danh sách following-feed:", error);
     return { items: [], next_cursor: null };
   }
 };
