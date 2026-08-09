@@ -15,7 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ExploreFeedItem, ExploreFeedResponse } from '@/services/recipe/recipeService';
-import { favoriteRecipe, unfavoriteRecipe } from '@/services/community/communityService';
+import { favoriteRecipe, unfavoriteRecipe, followUser, unfollowUser } from '@/services/community/communityService';
 import { SaveToCollectionModal } from '@/components/collections/SaveToCollectionModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
 
@@ -45,6 +45,33 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [activePostForModal, setActivePostForModal] = useState<ExploreFeedItem | null>(null);
+
+  const handleToggleFollow = async (item: ExploreFeedItem) => {
+    if (!item.author) return;
+    const authorId = item.author.id;
+    const previousFollowing = item.author.is_following;
+
+    // Cập nhật giao diện lập tức (Optimistic update) cho tất cả bài viết của tác giả này trong danh sách
+    setData(prev => prev.map(r => r.author?.id === authorId
+      ? { ...r, author: { ...r.author, is_following: !previousFollowing } }
+      : r
+    ));
+
+    try {
+      if (previousFollowing) {
+        await unfollowUser(authorId);
+      } else {
+        await followUser(authorId);
+      }
+    } catch (err: any) {
+      // Hoàn tác nếu gặp lỗi
+      setData(prev => prev.map(r => r.author?.id === authorId
+        ? { ...r, author: { ...r.author, is_following: previousFollowing } }
+        : r
+      ));
+      Alert.alert('Thao tác thất bại', err.message || 'Có lỗi xảy ra khi thực hiện theo dõi.');
+    }
+  };
 
   const handleToggleFavorite = async (item: ExploreFeedItem) => {
     const previousFavorited = item.is_favorited;
@@ -160,9 +187,14 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 
   const renderItem = ({ item }: { item: ExploreFeedItem }) => {
     return (
-      <View style={styles.postContainer}>
+      <View style={styles.cardContainer}>
+        {/* AUTHOR HEADER */}
         <View style={styles.authorHeader}>
-          <View style={styles.authorInfoLeft}>
+          <TouchableOpacity 
+            style={styles.authorInfoLeft}
+            activeOpacity={0.7}
+            onPress={() => router.push(`/user/${item.author?.id}` as any)}
+          >
             {item.author?.avatar ? (
               <Image source={{ uri: item.author.avatar }} style={styles.avatarImage} />
             ) : (
@@ -171,88 +203,127 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
               </View>
             )}
             <View style={styles.authorTextContainer}>
-              <Text style={styles.authorName}>{item.author?.name || 'Unknown User'}</Text>
+              <Text style={styles.authorName}>{item.author?.name || 'Đầu bếp'}</Text>
               <Text style={styles.authorHandle}>{item.author?.handle || '@user'}</Text>
             </View>
-          </View>
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>Follow</Text>
           </TouchableOpacity>
+
+          {!item.author?.is_self && (
+            <TouchableOpacity 
+              style={[
+                styles.followButton, 
+                item.author?.is_following && styles.followingButton
+              ]}
+              onPress={() => handleToggleFollow(item)}
+            >
+              <Text style={[
+                styles.followButtonText, 
+                item.author?.is_following && styles.followingButtonText
+              ]}>
+                {item.author?.is_following ? 'Đang follow' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
+        {/* MAIN RECIPE CARD (IMAGE) */}
         <TouchableOpacity 
-          style={styles.imageContainer}
-          activeOpacity={0.9}
+          style={styles.imageCard}
+          activeOpacity={0.95}
           onPress={() => router.push(`/recipe/${item.id}` as any)}
         >
           <Image source={{ uri: item.image }} style={styles.recipeImage} />
-          <View style={styles.titleOverlay}>
-            <Text style={styles.recipeTitle} numberOfLines={2}>
-              {item.title.toUpperCase()}
-            </Text>
-            <Text style={styles.recipeRatingStat}>
-              ⭐ {item.ratings_count > 0 ? `${item.ratings_avg.toFixed(1)} (${item.ratings_count} Đánh giá)` : "Chưa có đánh giá"}
-            </Text>
-          </View>
+          {/* Subtle gradient overlay at bottom for title readability */}
+          <View style={styles.imageGradientOverlay} />
         </TouchableOpacity>
 
-        {item.description ? (
-          <View style={styles.descriptionContainer}>
-            <Text style={styles.descriptionText}>
-              {renderDescriptionWithTags(item.description)}
-            </Text>
+        {/* DETAILS SECTION */}
+        <View style={styles.detailsSection}>
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => router.push(`/recipe/${item.id}` as any)}
+          >
+            <Text style={styles.recipeTitle}>{item.title}</Text>
+          </TouchableOpacity>
+
+          {/* RATING & STATS PILL BADGES */}
+          <View style={styles.metaRow}>
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={13} color="#FF9500" />
+              <Text style={styles.ratingBadgeText}>
+                {item.ratings_count > 0 ? `${item.ratings_avg.toFixed(1)} (${item.ratings_count} đánh giá)` : "Chưa có đánh giá"}
+              </Text>
+            </View>
           </View>
-        ) : null}
 
+          {/* DESCRIPTION */}
+          {item.description ? (
+            <View style={styles.descriptionContainer}>
+              <Text style={styles.descriptionText}>
+                {renderDescriptionWithTags(item.description)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* INSTAGRAM-STYLE ACTION BAR */}
         <View style={styles.actionBar}>
+          <View style={styles.actionBarLeft}>
+            {/* LIKE */}
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.7}
+              onPress={() => handleToggleFavorite(item)}
+            >
+              <Ionicons
+                name={item.is_favorited ? "heart" : "heart-outline"}
+                size={26}
+                color={item.is_favorited ? "#fe2c55" : "#1e293b"}
+              />
+              <Text style={[styles.actionBtnLabel, item.is_favorited && styles.likedLabel]}>
+                {item.save_count || 0}
+              </Text>
+            </TouchableOpacity>
+
+            {/* COMMENT */}
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.7}
+              onPress={() => router.push(`/recipe/${item.id}?tab=comments` as any)}
+            >
+              <Ionicons name="chatbubble-outline" size={24} color="#1e293b" />
+              <Text style={styles.actionBtnLabel}>{item.comments_count || 0}</Text>
+            </TouchableOpacity>
+
+            {/* SHARE */}
+            <TouchableOpacity 
+              style={styles.actionBtn} 
+              activeOpacity={0.7}
+              onPress={() => {
+                setActivePostForModal(item);
+                setIsShareModalOpen(true);
+              }}
+            >
+              <Ionicons name="paper-plane-outline" size={24} color="#1e293b" />
+            </TouchableOpacity>
+          </View>
+
+          {/* BOOKMARK (SAVE) */}
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleToggleFavorite(item)}
-          >
-            <Ionicons
-              name={item.is_favorited ? "heart" : "heart-outline"}
-              size={26}
-              color={item.is_favorited ? "#f04d4f" : "#555"}
-            />
-            <Text style={styles.actionText}>{item.save_count || 0}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerVertical} />
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push(`/recipe/${item.id}?tab=comments` as any)}
-          >
-            <Ionicons name="chatbubble-outline" size={24} color="#555" />
-            <Text style={styles.actionText}>{item.comments_count || 0}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerVertical} />
-
-          <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.bookmarkBtn}
+            activeOpacity={0.7}
             onPress={() => setSelectedRecipeForCollection(item.id)}
           >
             <Ionicons 
               name={item.is_in_collection ? "bookmark" : "bookmark-outline"} 
               size={24} 
-              color={item.is_in_collection ? "#1A1D1E" : "#555"} 
+              color={item.is_in_collection ? "#fe2c55" : "#1e293b"} 
             />
-            <Text style={[styles.actionText, item.is_in_collection && { color: '#1A1D1E', fontWeight: 'bold' }]}>Lưu</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerVertical} />
-
-          <TouchableOpacity style={styles.actionButton} onPress={() => {
-            setActivePostForModal(item);
-            setIsShareModalOpen(true);
-          }}>
-            <Ionicons name="paper-plane-outline" size={24} color="#555" />
-            <Text style={styles.actionText}>Share</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.postDivider} />
+        {/* BOTTOM POST SEPARATOR */}
+        <View style={styles.cardSeparator} />
       </View>
     );
   };
@@ -304,18 +375,20 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc', // slate-50 light background
   },
   centerLoading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
   feedScroll: {
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
-  postContainer: {
+  cardContainer: {
     backgroundColor: '#fff',
+    marginBottom: 0,
   },
   authorHeader: {
     flexDirection: 'row',
@@ -327,123 +400,165 @@ const styles = StyleSheet.create({
   authorInfoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: '#f1f5f9',
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFB74D',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#fe2c55',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   authorTextContainer: {
     justifyContent: 'center',
   },
   authorName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111',
-    marginBottom: 2,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a', // slate-900
+    marginBottom: 1,
   },
   authorHandle: {
-    fontSize: 13,
-    color: '#777',
+    fontSize: 12,
+    color: '#64748b', // slate-500
   },
   followButton: {
-    backgroundColor: '#FF5A5F',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    backgroundColor: '#fe2c55',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   followButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 12,
   },
-  imageContainer: {
-    width: width,
-    aspectRatio: 1,
+  followingButton: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  followingButtonText: {
+    color: '#475569',
+  },
+  imageCard: {
+    width: width - 32,
+    height: width - 32,
+    borderRadius: 24,
+    alignSelf: 'center',
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
     position: 'relative',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
   },
   recipeImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  titleOverlay: {
+  imageGradientOverlay: {
     position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(0,0,0,0.02)', // keep it clean
+  },
+  detailsSection: {
+    paddingHorizontal: 16,
+    marginTop: 14,
   },
   recipeTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-    lineHeight: 30,
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
+    letterSpacing: -0.2,
   },
-  recipeRatingStat: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginTop: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb', // amber-50
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: '#fef3c7',
+  },
+  ratingBadgeText: {
+    color: '#d97706', // amber-600
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  descriptionContainer: {
+    marginTop: 10,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#475569', // slate-600
+    lineHeight: 20,
+  },
+  hashtag: {
+    color: '#0284c7', // sky-600
+    fontWeight: '700',
   },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  actionButton: {
+  actionBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+    gap: 20,
   },
-  actionText: {
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionBtnLabel: {
+    fontSize: 14,
+    color: '#334155', // slate-700
+    fontWeight: '600',
     marginLeft: 6,
-    fontSize: 15,
-    color: '#555',
-    fontWeight: '500',
   },
-  dividerVertical: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#E0E0E0',
+  likedLabel: {
+    color: '#fe2c55',
   },
-  postDivider: {
-    height: 6,
-    backgroundColor: '#F5F5F5',
+  bookmarkBtn: {
+    padding: 2,
   },
-  descriptionContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 2,
+  cardSeparator: {
+    height: 12,
+    backgroundColor: '#f1f5f9', // slate-100
   },
-  descriptionText: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
-  },
-  hashtag: {
-    color: '#0056b3',
-    fontWeight: 'bold',
-  }
 });
