@@ -7,3 +7,9 @@ export const getApiBaseUrl = () => {
   const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
   return `http://${ipAddress}:5000/api`;
 };
+
+export const getWsBaseUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  const ipAddress = hostUri ? hostUri.split(':')[0] : 'localhost';
+  return `ws://${ipAddress}:5000/ws`;
+};

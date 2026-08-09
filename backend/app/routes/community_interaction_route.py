@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Body, status
+from fastapi import APIRouter, Depends, Body, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, CommentDB, RatingDB, FavoriteDB
@@ -6,6 +6,7 @@ from app.models.user_model import UserDB, FollowDB
 from app.schemas.recipe import CommentCreate, RatingCreate
 from app.utils.deps import get_current_user
 from app.utils.response import success_response, CustomException
+from app.utils.ws_manager import manager
 
 router = APIRouter(tags=["Community Interaction"])
 
@@ -13,6 +14,7 @@ router = APIRouter(tags=["Community Interaction"])
 @router.post("/recipes/{recipe_id}/comments")
 def add_comment(
     recipe_id: int,
+    background_tasks: BackgroundTasks,
     comment_data: CommentCreate = Body(...),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -54,6 +56,13 @@ def add_comment(
         db.add(new_comment)
         db.commit()
         db.refresh(new_comment)
+
+        total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
+        async def broadcast():
+            payload = {"type": "COMMENT_UPDATE", "recipe_id": recipe_id, "comments_count": total_comments}
+            await manager.broadcast_to_recipe(str(recipe_id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
         
         # Lấy thông tin tác giả bình luận để trả về luôn cho app
         return success_response(
@@ -156,6 +165,7 @@ def update_comment(
 @router.delete("/comments/{comment_id}")
 def delete_comment(
     comment_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -178,8 +188,16 @@ def delete_comment(
             )
 
         # 3. Tiến hành xóa
+        recipe_id = comment.recipe_id
         db.delete(comment)
         db.commit()
+
+        total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
+        async def broadcast():
+            payload = {"type": "COMMENT_UPDATE", "recipe_id": recipe_id, "comments_count": total_comments}
+            await manager.broadcast_to_recipe(str(recipe_id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
 
         # 4. Trả về kết quả
         return success_response(
@@ -263,6 +281,7 @@ def rate_recipe(
 @router.post("/recipes/{id}/favorite")
 def favorite_recipe(
     id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -290,6 +309,13 @@ def favorite_recipe(
         db.add(new_favorite)
         db.commit()
 
+        total = db.query(FavoriteDB).filter(FavoriteDB.recipe_id == id).count()
+        async def broadcast():
+            payload = {"type": "TYM_UPDATE", "recipe_id": id, "favorites_count": total}
+            await manager.broadcast_to_recipe(str(id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
+
         return success_response(
             message="Đã thêm vào yêu thích!",
             data={"isFavorited": True}
@@ -310,6 +336,7 @@ def favorite_recipe(
 @router.delete("/recipes/{id}/favorite")
 def unfavorite_recipe(
     id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -328,6 +355,13 @@ def unfavorite_recipe(
 
         db.delete(existing_favorite)
         db.commit()
+
+        total = db.query(FavoriteDB).filter(FavoriteDB.recipe_id == id).count()
+        async def broadcast():
+            payload = {"type": "TYM_UPDATE", "recipe_id": id, "favorites_count": total}
+            await manager.broadcast_to_recipe(str(id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
 
         return success_response(
             message="Đã bỏ yêu thích!",

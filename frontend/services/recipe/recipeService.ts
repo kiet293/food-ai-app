@@ -94,6 +94,24 @@ export const createRecipe = async (formData: FormData): Promise<boolean> => {
   }
 };
 
+export const updateRecipe = async (id: string, formData: FormData): Promise<boolean> => {
+  try {
+    const token = await getToken();
+    const response = await fetch(`${getApiBaseUrl()}/recipes/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+    const data = await response.json();
+    return data.status === 'success';
+  } catch (error) {
+    console.error('Error updating recipe:', error);
+    return false;
+  }
+};
+
 export interface ExploreGridResponse {
   items: ExploreGridItem[];
   next_cursor: number | null;
@@ -143,7 +161,7 @@ export interface ExploreFeedItem {
   ratings_avg: number;
   ratings_count: number;
   comments_count: number;
-  save_count: number;
+  favorites_count: number;
   is_favorited: boolean;
   is_in_collection?: boolean;
   cooked_count: number;

@@ -17,12 +17,16 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Keyboard,
-  Alert
+  Alert,
+  DeviceEventEmitter
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { fetchRecipeDetails, RecipeDetails } from '@/services/recipe/recipeService';
 import { postRecipeComment, postRecipeRating, CommentInfo, followUser, unfollowUser } from '@/services/community/communityService';
+import { CreatePostModal } from '@/components/community/CreatePostModal';
+import { SaveToCollectionModal } from '@/components/collections/SaveToCollectionModal';
+import { getWsBaseUrl } from '@/services/shared/apiConfig';
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -35,12 +39,14 @@ export default function RecipeDetailScreen() {
   const [replyTo, setReplyTo] = useState<{ id: number; name: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
+  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
   const [selectedRating, setSelectedRating] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
   const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({});
   const [followLoading, setFollowLoading] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
   const toggleIngredient = (idx: number) => {
     setCheckedIngredients(prev => ({ ...prev, [idx]: !prev[idx] }));
@@ -108,6 +114,25 @@ export default function RecipeDetailScreen() {
     return () => clearInterval(interval);
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    const wsUrl = `${getWsBaseUrl()}/recipes/${id}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Removed SAVE_UPDATE handling as save count is no longer tracked
+      } catch (e) {
+        console.error('WS Error:', e);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [id]);
+
   const handlePostComment = async () => {
     if (!commentText.trim() || !recipe || isPosting) return;
     setIsPosting(true);
@@ -151,6 +176,7 @@ export default function RecipeDetailScreen() {
 
     setCommentText('');
     setReplyTo(null);
+    Keyboard.dismiss();
 
     // Gửi API thật
     await postRecipeComment(recipeId, tempComment.content, parentId);
@@ -211,13 +237,15 @@ export default function RecipeDetailScreen() {
         )}
 
         <View style={styles.commentItem}>
-          {comment.user?.avatar ? (
-            <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatarImage} />
-          ) : (
-            <View style={styles.commentAvatar}>
-              <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
-            </View>
-          )}
+          <TouchableOpacity onPress={() => comment.user?.id && router.push(`/user/${comment.user.id}` as any)}>
+            {comment.user?.avatar ? (
+              <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatarImage} />
+            ) : (
+              <View style={styles.commentAvatar}>
+                <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.commentContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.commentUser}>{comment.user?.name || 'User'}</Text>
@@ -264,8 +292,8 @@ export default function RecipeDetailScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -281,6 +309,14 @@ export default function RecipeDetailScreen() {
           >
             <Ionicons name="chevron-back" size={24} color="#000" />
           </TouchableOpacity>
+          {recipe.author?.is_self && (
+            <TouchableOpacity
+              style={[styles.backBtn, { right: 16, left: 'auto', top: Platform.OS === 'android' ? (StatusBar.currentHeight || 20) + 12 : 50 }]}
+              onPress={() => setIsEditModalVisible(true)}
+            >
+              <Ionicons name="pencil" size={20} color="#000" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* FLOATING TITLE OVERLAP CARD */}
@@ -300,9 +336,9 @@ export default function RecipeDetailScreen() {
 
         {/* ACTION BAR CAPSULE */}
         <View style={styles.floatingActionBar}>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Ionicons name="bookmark" size={20} color="#fe2c55" />
-            <Text style={styles.actionText}>{recipe.save_count || 0} Đã lưu</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setIsSaveModalVisible(true)}>
+            <Ionicons name={recipe.is_in_collection ? "bookmark" : "bookmark-outline"} size={20} color={recipe.is_in_collection ? "#fe2c55" : "#444"} />
+            <Text style={styles.actionText}>Lưu sổ tay</Text>
           </TouchableOpacity>
           <View style={styles.actionBarDivider} />
           
@@ -324,7 +360,10 @@ export default function RecipeDetailScreen() {
         {/* AUTHOR CARD SECTION */}
         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
           <View style={styles.authorCard}>
-            <View style={styles.authorInfoLeft}>
+            <TouchableOpacity 
+              style={styles.authorInfoLeft}
+              onPress={() => recipe.author?.id && router.push(`/user/${recipe.author.id}` as any)}
+            >
               {recipe.author?.avatar ? (
                 <Image source={{ uri: recipe.author.avatar }} style={styles.authorAvatar} />
               ) : (
@@ -336,7 +375,7 @@ export default function RecipeDetailScreen() {
                 <Text style={styles.authorNameText}>{recipe.author?.name || 'Đầu bếp'}</Text>
                 <Text style={styles.authorHandleText}>{recipe.author?.handle || '@user'}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             {!recipe.author?.is_self && (
               <TouchableOpacity
                 style={[
@@ -564,6 +603,32 @@ export default function RecipeDetailScreen() {
           </View>
         </View>
       )}
+
+      {/* EDIT MODAL */}
+      <CreatePostModal
+        visible={isEditModalVisible}
+        onClose={() => setIsEditModalVisible(false)}
+        isEditMode={true}
+        recipeId={id as string}
+        initialData={recipe}
+        onPostCreated={() => {
+          setIsEditModalVisible(false);
+          loadData();
+        }}
+      />
+
+      <SaveToCollectionModal
+        visible={isSaveModalVisible}
+        onClose={() => setIsSaveModalVisible(false)}
+        recipeId={id as string}
+        onSavedChange={(isSavedInAny) => {
+          setRecipe((prev) => {
+            if (!prev || prev.is_in_collection === isSavedInAny) return prev;
+            DeviceEventEmitter.emit('recipeSavedStateChanged', { recipeId: Number(id), isSaved: isSavedInAny });
+            return { ...prev, is_in_collection: isSavedInAny };
+          });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

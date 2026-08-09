@@ -17,8 +17,16 @@ class CollectionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RecipeSummary(BaseModel):
+    id: int
+    recipe_name: Optional[str] = None
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class CollectionDetailResponse(CollectionResponse):
-    recipes: List[Any] = []
+    recipes: List[RecipeSummary] = []
 
 class CollectionRecipeAdd(BaseModel):
     recipe_id: int

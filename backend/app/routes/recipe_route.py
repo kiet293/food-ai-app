@@ -110,7 +110,7 @@ def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = Non
         "ratings_avg": round(ratings_avg, 1),
         "ratings_count": len(ratings_list),
         "comments_count": len(recipe.comments) if recipe.comments else 0,
-        "save_count": len(recipe.favorites) if recipe.favorites else 0,
+        "favorites_count": len(recipe.favorites) if recipe.favorites else 0,
         "is_favorited": is_favorited,
         "is_in_collection": is_in_collection,
         "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
@@ -572,6 +572,13 @@ def get_recipe_details(
         recipe_data["instructions"] = recipe.instructions
         recipe_data["servings"] = recipe.servings
         
+        # Fetch category and tags
+        recipe_category = db.query(CategoryDB).join(RecipeCategoryDB).filter(RecipeCategoryDB.recipe_id == recipe.id).first()
+        recipe_data["category_name"] = recipe_category.name if recipe_category else None
+        
+        tags = db.query(TagDB).join(RecipeTagDB).filter(RecipeTagDB.recipe_id == recipe.id).all()
+        recipe_data["tags"] = [t.name for t in tags]
+        
         # Bổ sung nội dung chi tiết bình luận dạng cây (comments array)
         comments_dict = {}
         root_comments = []
@@ -713,6 +720,8 @@ def update_recipe(
     cook_time_minutes: int = Form(None),
     servings: int = Form(None),
     difficulty: str = Form(None),
+    category_name: str = Form(None),
+    tags: str = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -778,6 +787,35 @@ def update_recipe(
             recipe.servings = servings
         if difficulty is not None:
             recipe.difficulty = difficulty
+
+        # Xử lý Category
+        if category_name is not None:
+            db.query(RecipeCategoryDB).filter(RecipeCategoryDB.recipe_id == recipe.id).delete()
+            category = db.query(CategoryDB).filter(CategoryDB.name == category_name).first()
+            if category:
+                db.add(RecipeCategoryDB(recipe_id=recipe.id, category_id=category.id))
+
+        # Xử lý Tags
+        if tags is not None:
+            try:
+                db.query(RecipeTagDB).filter(RecipeTagDB.recipe_id == recipe.id).delete()
+                parsed_tags = json.loads(tags)
+                if isinstance(parsed_tags, list):
+                    for tag_name in parsed_tags:
+                        tag_name = tag_name.strip()
+                        if not tag_name: continue
+                        tag_slug = slugify(tag_name)
+                        existing_tag = db.query(TagDB).filter(TagDB.slug == tag_slug).first()
+                        if not existing_tag:
+                            existing_tag = TagDB(name=tag_name, slug=tag_slug, usage_count=1)
+                            db.add(existing_tag)
+                            db.commit()
+                            db.refresh(existing_tag)
+                        else:
+                            existing_tag.usage_count += 1
+                        db.add(RecipeTagDB(recipe_id=recipe.id, tag_id=existing_tag.id))
+            except json.JSONDecodeError as e:
+                print(f"Lỗi parse tags JSON: {e}")
 
         # Lưu thay đổi
         db.commit()

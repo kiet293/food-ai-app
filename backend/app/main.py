@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from app.utils.response import CustomException
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import database, recipe_model, reel_model, collection_model
-from app.routes import ai_route, recipe_route, auth_route, search_route, community_interaction_route, reel_route, tag_route, user_route, collection_route
+from app.routes import ai_route, recipe_route, auth_route, search_route, community_interaction_route, reel_route, tag_route, user_route, collection_route, ws_route
 from app.tasks.trending_task import trending_scheduler_task
 import asyncio
 from dotenv import load_dotenv
@@ -41,6 +41,7 @@ app.include_router(reel_route.router, prefix="/api/reels", tags=["Reels Manageme
 app.include_router(tag_route.router, prefix="/api/tags", tags=["Tag Management"])
 app.include_router(user_route.router, prefix="/api/users", tags=["User Management"])
 app.include_router(collection_route.router, prefix="/api/collections", tags=["Collection Management"])
+app.include_router(ws_route.router, tags=["WebSockets"])
 
 # Khai báo cấu hình Cloudinary trong quá trình khởi động ứng dụng
 cloudinary.config(

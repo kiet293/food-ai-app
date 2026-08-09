@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
   BackHandler,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { ExploreFeedItem, ExploreFeedResponse } from '@/services/recipe/recipeSe
 import { favoriteRecipe, unfavoriteRecipe, followUser, unfollowUser } from '@/services/community/communityService';
 import { SaveToCollectionModal } from '@/components/collections/SaveToCollectionModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
+import { getWsBaseUrl } from '@/services/shared/apiConfig';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +47,59 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [activePostForModal, setActivePostForModal] = useState<ExploreFeedItem | null>(null);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'recipeSavedStateChanged',
+      (event: { recipeId: number; isSaved: boolean }) => {
+        setData((prevData) =>
+          prevData.map((item) => {
+            if (item.id === event.recipeId) {
+              return { ...item, is_in_collection: event.isSaved };
+            }
+            return item;
+          })
+        );
+      }
+    );
+
+    const wsUrl = `${getWsBaseUrl()}/feed`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('✅ Connected to GLOBAL_FEED WebSocket');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'TYM_UPDATE') {
+          setData((prev) =>
+            prev.map((item) =>
+              item.id === msg.recipe_id
+                ? { ...item, favorites_count: msg.favorites_count }
+                : item
+            )
+          );
+        } else if (msg.type === 'COMMENT_UPDATE') {
+          setData((prev) =>
+            prev.map((item) =>
+              item.id === msg.recipe_id
+                ? { ...item, comments_count: msg.comments_count }
+                : item
+            )
+          );
+        }
+      } catch (e) {
+        console.error('WS Error:', e);
+      }
+    };
+
+    return () => {
+      subscription.remove();
+      ws.close();
+    };
+  }, []);
 
   const handleToggleFollow = async (item: ExploreFeedItem) => {
     if (!item.author) return;
@@ -75,11 +130,11 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 
   const handleToggleFavorite = async (item: ExploreFeedItem) => {
     const previousFavorited = item.is_favorited;
-    const previousCount = item.save_count;
+    const previousCount = item.favorites_count;
 
     // Optimistic update
     setData(prev => prev.map(r => r.id === item.id
-      ? { ...r, is_favorited: !previousFavorited, save_count: previousFavorited ? previousCount - 1 : previousCount + 1 }
+      ? { ...r, is_favorited: !previousFavorited, favorites_count: previousFavorited ? previousCount - 1 : previousCount + 1 }
       : r
     ));
 
@@ -91,7 +146,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
       }
     } catch (err: any) {
       setData(prev => prev.map(r => r.id === item.id
-        ? { ...r, is_favorited: previousFavorited, save_count: previousCount }
+        ? { ...r, is_favorited: previousFavorited, favorites_count: previousCount }
         : r
       ));
       Alert.alert('Thao tác thất bại', err.message || 'Bạn cần đăng nhập để yêu thích công thức này.');
@@ -281,7 +336,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
                 color={item.is_favorited ? "#fe2c55" : "#1e293b"}
               />
               <Text style={[styles.actionBtnLabel, item.is_favorited && styles.likedLabel]}>
-                {item.save_count || 0}
+                {item.favorites_count || 0}
               </Text>
             </TouchableOpacity>
 

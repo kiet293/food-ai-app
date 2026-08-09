@@ -17,7 +17,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { MOCK_HOT_TAGS } from '../../services/mock/mockCommunityData';
-import { fetchCategories, createRecipe } from '../../services/recipe/recipeService';
+import { fetchCategories, createRecipe, updateRecipe } from '../../services/recipe/recipeService';
 
 interface CreatePostModalProps {
   visible: boolean;
@@ -30,12 +30,18 @@ interface CreatePostModalProps {
     category: string;
     instructions: string[];
   }) => void;
+  isEditMode?: boolean;
+  recipeId?: string;
+  initialData?: any;
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   visible,
   onClose,
   onPostCreated,
+  isEditMode = false,
+  recipeId,
+  initialData,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -49,19 +55,67 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const hasInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!visible) {
+      hasInitialized.current = false;
+    }
+  }, [visible]);
 
   useEffect(() => {
     const loadCategories = async () => {
       const data = await fetchCategories();
       const catNames = data.map(c => c.name);
       setCategories(catNames);
-      if (catNames.length > 0) {
+      if (catNames.length > 0 && !isEditMode) {
         setSelectedCategory(catNames[0]);
         setCategorySearch(catNames[0]);
       }
     };
     loadCategories();
-  }, []);
+  }, [isEditMode]);
+
+  useEffect(() => {
+    if (visible && isEditMode && initialData && !hasInitialized.current) {
+      hasInitialized.current = true;
+      setTitle(initialData.title || initialData.recipeName || '');
+      setDescription(initialData.description || '');
+      
+      const defaultImage = initialData.image || initialData.image_url;
+      setImages(defaultImage ? [defaultImage] : []);
+      
+      const ings = initialData.ingredients ? initialData.ingredients.map((i: any) => typeof i === 'string' ? i : i.name) : [''];
+      setIngredients(ings.length > 0 ? [...ings, ''] : ['', '']);
+      
+      const stps = initialData.instructions || [''];
+      setSteps(stps.length > 0 ? [...stps, ''] : ['', '']);
+      
+      if (initialData.category_name) {
+        setSelectedCategory(initialData.category_name);
+        setCategorySearch(initialData.category_name);
+      }
+      
+      // Note: tags are currently part of the description by parsing hashtags
+      if (initialData.tags && initialData.tags.length > 0) {
+        const hashtags = initialData.tags.map((t: string) => `#${t}`).join(' ');
+        if (!initialData.description?.includes(hashtags)) {
+          setDescription(`${initialData.description || ''} ${hashtags}`.trim());
+        }
+      }
+    } else if (visible && !isEditMode && !hasInitialized.current) {
+      hasInitialized.current = true;
+      setTitle('');
+      setDescription('');
+      setImages([]);
+      setIngredients(['', '']);
+      setSteps(['', '']);
+      if (categories.length > 0) {
+        setSelectedCategory(categories[0]);
+        setCategorySearch(categories[0]);
+      }
+    }
+  }, [visible, isEditMode, initialData, categories]);
 
   useEffect(() => {
     // Tự động cuộn xuống khi có ô nhập liệu mới được thêm vào
@@ -166,20 +220,26 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     formData.append('tags', JSON.stringify(extractedTags));
 
     const uri = images[0];
-    if (uri.startsWith('file://')) {
+    if (uri && uri.startsWith('file://')) {
       const filename = uri.split('/').pop() || 'image.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : `image/jpeg`;
       formData.append('image', { uri, name: filename, type } as any);
-    } else {
+    } else if (uri && !isEditMode) {
       // For web or remote urls, we might need a Blob, but assuming React Native file uri here.
       formData.append('image', { uri, name: 'image.jpg', type: 'image/jpeg' } as any);
     }
 
     try {
-      const success = await createRecipe(formData);
+      let success = false;
+      if (isEditMode && recipeId) {
+        success = await updateRecipe(recipeId, formData);
+      } else {
+        success = await createRecipe(formData);
+      }
+      
       if (success) {
-        Alert.alert('Thành công', 'Đăng tải món ăn thành công!', [
+        Alert.alert('Thành công', isEditMode ? 'Cập nhật món ăn thành công!' : 'Đăng tải món ăn thành công!', [
           {
             text: 'OK',
             onPress: () => {
@@ -223,7 +283,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Ionicons name="close" size={26} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chia Sẻ Bài Viết Mới</Text>
+          <Text style={styles.headerTitle}>{isEditMode ? 'Chỉnh Sửa Bài Viết' : 'Chia Sẻ Bài Viết Mới'}</Text>
           <TouchableOpacity 
             style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]} 
             onPress={handleSubmit}
@@ -232,7 +292,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             {isSubmitting ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>Đăng</Text>
+              <Text style={styles.submitBtnText}>{isEditMode ? 'Lưu lại' : 'Đăng'}</Text>
             )}
           </TouchableOpacity>
         </View>

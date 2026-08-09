@@ -54,15 +54,12 @@ export const SaveToCollectionModal: React.FC<SaveToCollectionModalProps> = ({
       ]);
       setCollections(allCols);
       setSelectedIds(savedIds);
-      if (onSavedChange) {
-        onSavedChange(savedIds.length > 0);
-      }
     } catch (error) {
       console.error('❌ Lỗi tải bộ sưu tập trong popup:', error);
     } finally {
       setLoading(false);
     }
-  }, [visible, recipeId, onSavedChange]);
+  }, [visible, recipeId]);
 
   useEffect(() => {
     loadData();
