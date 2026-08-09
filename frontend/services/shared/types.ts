@@ -4,4 +4,6 @@ export interface AuthorInfo {
   name: string;
   handle: string;
   avatar: string;
+  is_following?: boolean;
+  is_self?: boolean;
 }

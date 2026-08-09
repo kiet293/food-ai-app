@@ -57,24 +57,24 @@ export const ProfileAvatarSection: React.FC<ProfileAvatarSectionProps> = ({
 const styles = StyleSheet.create({
   avatarSection: {
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 8,
   },
   statusBubble: {
     backgroundColor: '#f1f2f5',
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 16,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statusBubbleText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#333',
     fontWeight: '500',
   },
   avatarWrapper: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
@@ -83,12 +83,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarEmoji: {
-    fontSize: 54,
+    fontSize: 44,
   },
   plusStoryBadge: {
     position: 'absolute',

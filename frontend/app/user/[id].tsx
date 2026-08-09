@@ -155,7 +155,13 @@ export default function UserProfileScreen() {
             isDarkMode={isDarkMode}
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
-            onPressRecipe={(recipeId) => router.push(`/recipe/${recipeId}`)}
+            onPressRecipe={(recipeId) => {
+              if (typeof recipeId === 'string' && recipeId.startsWith('rec-')) {
+                Alert.alert("Dữ liệu mẫu", "Đây là bài viết mẫu để trang trí, không có sẵn chi tiết.");
+                return;
+              }
+              router.push(`/recipe/${recipeId}`);
+            }}
           />
         )}
 

@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 8,
     paddingHorizontal: 20,
   },
   statItem: {

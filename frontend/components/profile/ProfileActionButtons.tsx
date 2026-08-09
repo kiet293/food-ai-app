@@ -95,11 +95,11 @@ export const ProfileActionButtons: React.FC<ProfileActionButtonsProps> = ({
 const styles = StyleSheet.create({
   actionButtonsSection: {
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 6,
     paddingHorizontal: 20,
   },
   bioTextWrapper: {
-    marginVertical: 10,
+    marginVertical: 4,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
@@ -110,9 +110,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   addBioPill: {
-    marginVertical: 10,
+    marginVertical: 4,
     paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingVertical: 5,
     borderRadius: 16,
   },
   addBioText: {
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingVertical: 7,
     borderRadius: 6,
   },
   actionBtnText: {

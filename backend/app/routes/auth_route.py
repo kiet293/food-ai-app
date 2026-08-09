@@ -9,7 +9,7 @@ from app.utils.security import get_password_hash, verify_password, create_access
 
 from app.models.user_model import UserDB, FollowDB
 from app.models.reel_model import ReelDB, ReelLikeDB, ReelCommentDB
-from app.models.recipe_model import FavoriteDB
+from app.models.recipe_model import FavoriteDB, RecipeDB
 
 
 router = APIRouter()
@@ -98,6 +98,16 @@ def get_my_profile(
         # 5. Đếm số công thức đã lưu
         saved_recipes_count = db.query(FavoriteDB).filter(FavoriteDB.user_id == current_user.id).count()
 
+        # 6. Lấy danh sách công thức của chính người dùng này
+        recent_recipes = db.query(RecipeDB).filter(RecipeDB.user_id == current_user.id).order_by(RecipeDB.created_at.desc()).limit(10).all()
+        recent_data = [
+            {
+                "id": str(r.id),
+                "title": r.recipe_name,
+                "image": r.image_url or "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80"
+            } for r in recent_recipes
+        ]
+
         return {
             "id": current_user.id,
             "username": current_user.username,
@@ -111,6 +121,7 @@ def get_my_profile(
             "saved_recipes_count": saved_recipes_count,
             "my_reels": my_reels,
             "liked_reels": liked_reels,
+            "recent_recipes": recent_data,
             "joined_at": current_user.created_at.strftime("%d/%m/%Y") if current_user.created_at else "N/A"
         }
     except Exception as e:

@@ -82,14 +82,14 @@ export const ProfileRecentlyAdded: React.FC<ProfileRecentlyAddedProps> = ({
 
 const styles = StyleSheet.create({
   sectionContainer: {
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 0,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   carouselContainer: {
     paddingHorizontal: 16,

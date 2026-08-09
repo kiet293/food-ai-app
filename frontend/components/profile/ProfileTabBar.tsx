@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   tabBarRow: {
     flexDirection: 'row',
     borderBottomWidth: 0.5,
-    marginTop: 10,
+    marginTop: 6,
   },
   tabIconBtn: {
     flex: 1,

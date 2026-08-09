@@ -43,6 +43,7 @@ export interface ProfileUserData {
   saved_recipes_count: number;
   my_reels?: any[];
   liked_reels?: any[];
+  recent_recipes?: any[];
   joined_at: string;
 }
 
@@ -76,6 +77,7 @@ export default function ProfileScreen() {
     setIsLoading(true);
     try {
       const data = await getUserProfile();
+      console.log("ProfileScreen loaded profile data:", data);
       if (data) {
         setUserInfo(data);
       }
@@ -246,8 +248,14 @@ export default function ProfileScreen() {
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
             dynamicBorderColor={dynamicBorderColor}
-            onPressFollowing={() => router.push(`/user/${userInfo.id}/followers?tab=following`)}
-            onPressFollowers={() => router.push(`/user/${userInfo.id}/followers?tab=followers`)}
+            onPressFollowing={() => router.push({
+              pathname: '/user/[id]/followers',
+              params: { id: String(userInfo.id), name: userInfo.full_name, handle: '@' + userInfo.username, tab: 'following' }
+            })}
+            onPressFollowers={() => router.push({
+              pathname: '/user/[id]/followers',
+              params: { id: String(userInfo.id), name: userInfo.full_name, handle: '@' + userInfo.username, tab: 'followers' }
+            })}
           />
 
           {/* 4. Action Buttons & Bio (TikTok Style) */}
@@ -263,11 +271,17 @@ export default function ProfileScreen() {
 
           {/* 5. Section Bài viết mới thêm (Recently Added Carousel) */}
           <ProfileRecentlyAdded
-            recipes={savedRecipesList}
+            recipes={savedRecipesList || []}
             isDarkMode={isDarkMode}
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
-            onPressRecipe={(id) => router.push(`/recipe/${id}`)}
+            onPressRecipe={(id) => {
+              if (typeof id === 'string' && id.startsWith('rec-')) {
+                Alert.alert("Dữ liệu mẫu", "Đây là bài viết mẫu để trang trí, không có sẵn chi tiết.");
+                return;
+              }
+              router.push(`/recipe/${id}`);
+            }}
           />
 
           {/* 6. Multi-Tab Bar */}

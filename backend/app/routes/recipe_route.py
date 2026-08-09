@@ -66,11 +66,26 @@ def delete_image_from_cloudinary(image_url: str):
 def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = None):
     author_info = None
     if recipe.author:
+        from sqlalchemy.orm import Session
+        db = Session.object_session(recipe)
+        is_following = False
+        is_self = False
+        if current_user and db:
+            is_self = current_user.id == recipe.author.id
+            if not is_self:
+                from app.models.user_model import FollowDB
+                is_following = db.query(FollowDB).filter(
+                    FollowDB.follower_id == current_user.id,
+                    FollowDB.following_id == recipe.author.id
+                ).first() is not None
+
         author_info = {
             "id": recipe.author.id,
             "name": recipe.author.full_name or recipe.author.username,
             "handle": f"@{recipe.author.username}",
-            "avatar": recipe.author.avatar
+            "avatar": recipe.author.avatar,
+            "is_following": is_following,
+            "is_self": is_self
         }
 
     ratings_list = [r.score for r in recipe.ratings] if recipe.ratings else []
