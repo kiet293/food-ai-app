@@ -243,12 +243,17 @@ export interface RecipeDetails extends ExploreFeedItem {
 export const fetchRecipeDetails = async (id: number): Promise<RecipeDetails | null> => {
   try {
     const API_BASE_URL = getApiBaseUrl();
+    const token = await getToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers
     });
 
     if (!response.ok) {
