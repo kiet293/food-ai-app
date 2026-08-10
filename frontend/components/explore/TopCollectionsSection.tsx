@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CollectionItem } from '@/services/mockCommunityData';
+import { CollectionItem } from '@/services/mock/mockCommunityData';
 
 interface TopCollectionsSectionProps {
   collections: CollectionItem[];

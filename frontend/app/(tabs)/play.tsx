@@ -8,11 +8,14 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchReels, toggleLikeReel } from '@/services/reelService';
+import { useIsFocused } from '@react-navigation/native';
+import { fetchReels, toggleLikeReel } from '@/services/reel/reelService';
+import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
 import CreateReelModal from '@/components/reels/CreateReelModal';
@@ -22,6 +25,7 @@ const { height } = Dimensions.get('window');
 
 export default function PlayScreen() {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   // Khởi tạo chiều cao
   const [reelHeight, setReelHeight] = useState(height - insets.bottom - 60);
 
@@ -29,6 +33,7 @@ export default function PlayScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [activeReelId, setActiveReelId] = useState<string>('');
+  const [isCurrentVideoPlaying, setIsCurrentVideoPlaying] = useState(true);
 
   // Quản lý trạng thái mở/đóng các Modal tương tác
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
@@ -51,10 +56,10 @@ export default function PlayScreen() {
   useEffect(() => {
     loadReels();
 
-    // Cấu hình chế độ âm thanh toàn hệ thống cho Expo (Cho phép phát âm thanh khi máy bật chế độ im lặng)
     Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
+      shouldDuckAndroid: false,
     }).catch(err => console.log('Audio mode error:', err));
   }, []);
 
@@ -85,19 +90,43 @@ export default function PlayScreen() {
     }
   };
 
-  // Hàm xử lý theo dõi/bỏ theo dõi đầu bếp ảo
-  const toggleFollow = (reelId: string) => {
+  // Hàm xử lý theo dõi/bỏ theo dõi đầu bếp ảo bằng API thực tế (Optimistic UI)
+  const toggleFollow = async (reelId: string) => {
+    const targetReel = reels.find((r) => r.id === reelId);
+    if (!targetReel) return;
+
+    const targetUserId = parseInt(targetReel.author.id.replace('user-', ''), 10);
+    if (isNaN(targetUserId)) return;
+
+    // 1. Optimistic Update (Cập nhật giao diện lập tức)
+    const previousReelsState = reels;
+    const isCurrentlyFollowing = targetReel.author.isFollowing;
+
+    // Cập nhật tất cả các video của cùng tác giả này trên màn hình hiện tại
     setReels((prev) =>
       prev.map((r) => {
-        if (r.id === reelId) {
+        if (r.author.id === targetReel.author.id) {
           return {
             ...r,
-            author: { ...r.author, isFollowing: !r.author.isFollowing },
+            author: { ...r.author, isFollowing: !isCurrentlyFollowing },
           };
         }
         return r;
       })
     );
+
+    try {
+      // 2. Gọi API tương ứng từ backend chạy ngầm
+      if (isCurrentlyFollowing) {
+        await unfollowUser(targetUserId);
+      } else {
+        await followUser(targetUserId);
+      }
+    } catch (err: any) {
+      // 3. Rollback nếu có lỗi hoặc chưa đăng nhập
+      setReels(previousReelsState);
+      Alert.alert('Thao tác thất bại', err.message || 'Bạn cần đăng nhập để theo dõi đầu bếp.');
+    }
   };
 
   // Hàm bật/tắt tiếng chung cho toàn bộ các video đang phát
@@ -157,7 +186,7 @@ export default function PlayScreen() {
           renderItem={({ item }) => (
             <ReelVideoItem
               item={item}
-              isActive={item.id === activeReelId}
+              isActive={isFocused && item.id === activeReelId}
               isMuted={isMuted}
               reelHeight={reelHeight}
               onToggleMute={toggleMuteAll}
@@ -171,6 +200,7 @@ export default function PlayScreen() {
                 setActiveReelForModal(r);
                 setIsShareModalOpen(true);
               }}
+              onPlayStateChange={(isPlaying) => setIsCurrentVideoPlaying(isPlaying)}
             />
           )}
         />
@@ -180,7 +210,21 @@ export default function PlayScreen() {
       <CommentModal
         visible={isCommentModalOpen}
         onClose={() => setIsCommentModalOpen(false)}
-        postTitle={activeReelForModal?.recipe?.title}
+        postTitle={activeReelForModal?.caption}
+        reelDbId={activeReelForModal?.db_id}
+        onCommentAdded={(newCount) => {
+          if (activeReelForModal) {
+            // Cập nhật số lượng bình luận hiển thị động trên UI Reels chính
+            setReels((prev) =>
+              prev.map((r) => {
+                if (r.id === activeReelForModal.id) {
+                  return { ...r, commentsCount: newCount };
+                }
+                return r;
+              })
+            );
+          }
+        }}
       />
 
       <SharePostModal

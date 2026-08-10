@@ -1,16 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { getApiBaseUrl } from '../shared/apiConfig';
 
-const getBaseUrl = () => {
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-        const ipAddress = hostUri.split(':')[0];
-        return `http://${ipAddress}:5000/api/auth`;
-    }
-    return 'http://localhost:5000/api/auth';
-};
-
-const AUTH_URL = getBaseUrl();
+const AUTH_URL = `${getApiBaseUrl()}/auth`;
 
 // Hàm Đăng ký hoặc Đăng nhập chung
 export const authenticateUser = async (username: string, password: string, isLogin: boolean) => {
@@ -88,11 +79,16 @@ export const getUserProfile = async () => {
     }
 };
 
-// HÀM CẬP NHẬT THÔNG TIN CÁ NHÂN
-export const updateUserProfile = async (fullName: String, avatar: String) => {
+// HÀM CẬP NHẬT THÔNG TIN CÁ NHÂN (Tên, Avatar, Bio)
+export const updateUserProfile = async (fullName?: string, avatar?: string, bio?: string) => {
     try {
         const token = await getToken();
         if (!token) throw new Error("Chưa đăng nhập");
+
+        const bodyData: any = {};
+        if (fullName !== undefined) bodyData.full_name = fullName;
+        if (avatar !== undefined) bodyData.avatar = avatar;
+        if (bio !== undefined) bodyData.bio = bio;
 
         const response = await fetch(`${AUTH_URL}/me/update`, {
             method: 'PUT',
@@ -100,10 +96,7 @@ export const updateUserProfile = async (fullName: String, avatar: String) => {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                full_name: fullName,
-                avatar: avatar
-            })
+            body: JSON.stringify(bodyData)
         });
 
         if (!response.ok) throw new Error("Không thể cập nhật thông tin");
@@ -114,3 +107,38 @@ export const updateUserProfile = async (fullName: String, avatar: String) => {
         return false;
     }
 }
+
+// HÀM CẬP NHẬT ẢNH ĐẠI DIỆN BẰNG FILE
+export const updateUserAvatar = async (imageUri: string) => {
+    try {
+        const token = await getToken();
+        if (!token) throw new Error("Chưa đăng nhập");
+
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'avatar.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('file', {
+            uri: imageUri,
+            name: filename,
+            type,
+        } as any);
+
+        const response = await fetch(`${AUTH_URL}/me/avatar`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+            },
+            body: formData,
+        });
+
+        if (!response.ok) throw new Error("Không thể tải ảnh lên");
+
+        return await response.json();
+    } catch (error) {
+        console.error("❌ Lỗi tải ảnh lên:", error);
+        throw error;
+    }
+};

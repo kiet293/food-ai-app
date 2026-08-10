@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {  Alert} from 'react-native';
-import { AIAnalysisResult, analyzeImagesWithAI } from '../services/aiService';
+import { AIAnalysisResult, analyzeImagesWithAI } from '../services/ai/aiService';
 
 export function useImageAnalysis() {
   const [images, setImages] = useState<string[]>([]);

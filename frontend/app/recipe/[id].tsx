@@ -1,9 +1,10 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+  
   TouchableOpacity,
   Image,
   ActivityIndicator,
@@ -12,11 +13,20 @@ import {
   ScrollView,
   Platform,
   TextInput,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Alert,
+  DeviceEventEmitter
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { fetchRecipeDetails, postRecipeComment, RecipeDetails, CommentInfo } from '@/services/exploreService';
+import { fetchRecipeDetails, RecipeDetails } from '@/services/recipe/recipeService';
+import { postRecipeComment, postRecipeRating, CommentInfo, followUser, unfollowUser } from '@/services/community/communityService';
+import { CreatePostModal } from '@/components/community/CreatePostModal';
+import { SaveToCollectionModal } from '@/components/collections/SaveToCollectionModal';
+import { getWsBaseUrl } from '@/services/shared/apiConfig';
 const { width } = Dimensions.get('window');
 export default function RecipeDetailScreen() {
   const router = useRouter();
@@ -28,6 +38,60 @@ export default function RecipeDetailScreen() {
   const [commentText, setCommentText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: number; name: string } | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [isRatingModalVisible, setIsRatingModalVisible] = useState(false);
+  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
+  const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({});
+  const [followLoading, setFollowLoading] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+
+  const toggleIngredient = (idx: number) => {
+    setCheckedIngredients(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const toggleStep = (idx: number) => {
+    setCompletedSteps(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const handleToggleFollow = async () => {
+    if (!recipe || !recipe.author || followLoading) return;
+    setFollowLoading(true);
+    const authorId = recipe.author.id;
+    const isFollowing = recipe.author.is_following;
+    try {
+      if (isFollowing) {
+        const success = await unfollowUser(authorId);
+        if (success) {
+          setRecipe(prev => {
+            if (!prev || !prev.author) return prev;
+            return {
+              ...prev,
+              author: { ...prev.author, is_following: false }
+            };
+          });
+        }
+      } else {
+        const success = await followUser(authorId);
+        if (success) {
+          setRecipe(prev => {
+            if (!prev || !prev.author) return prev;
+            return {
+              ...prev,
+              author: { ...prev.author, is_following: true }
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const loadData = async () => {
     if (!id) return;
     const data = await fetchRecipeDetails(parseInt(id as string, 10));
@@ -37,7 +101,7 @@ export default function RecipeDetailScreen() {
 
   useEffect(() => {
     loadData();
-    
+
     // Polling every 5 seconds to get new comments
     const interval = setInterval(() => {
       if (id) {
@@ -46,8 +110,27 @@ export default function RecipeDetailScreen() {
         });
       }
     }, 5000);
-    
+
     return () => clearInterval(interval);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const wsUrl = `${getWsBaseUrl()}/recipes/${id}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Removed SAVE_UPDATE handling as save count is no longer tracked
+      } catch (e) {
+        console.error('WS Error:', e);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
   }, [id]);
 
   const handlePostComment = async () => {
@@ -56,7 +139,7 @@ export default function RecipeDetailScreen() {
 
     const recipeId = parseInt(id as string, 10);
     const parentId = replyTo ? replyTo.id : undefined;
-    
+
     // Optimistic UI Update (Cập nhật tạm thời lên màn hình)
     const tempComment: CommentInfo = {
       id: Math.random(), // ID tạm
@@ -70,7 +153,7 @@ export default function RecipeDetailScreen() {
     setRecipe(prev => {
       if (!prev) return prev;
       const newComments = [...(prev.comments || [])];
-      
+
       if (parentId) {
         // Tìm comment cha để nhét vào (Chỉ hỗ trợ đệ quy 1 tầng tìm kiếm tạm thời)
         const addReply = (comments: CommentInfo[]) => {
@@ -87,19 +170,38 @@ export default function RecipeDetailScreen() {
       } else {
         newComments.push(tempComment);
       }
-      
+
       return { ...prev, comments: newComments };
     });
 
     setCommentText('');
     setReplyTo(null);
+    Keyboard.dismiss();
 
     // Gửi API thật
     await postRecipeComment(recipeId, tempComment.content, parentId);
-    
+
     // Sau khi POST xong thì load lại data chuẩn từ server
     await loadData();
     setIsPosting(false);
+  };
+
+  const handleSubmitRating = async () => {
+    if (selectedRating === 0 || !id) return;
+    setIsSubmittingRating(true);
+    
+    const recipeId = parseInt(id as string, 10);
+    const success = await postRecipeRating(recipeId, selectedRating, ratingComment);
+    
+    setIsSubmittingRating(false);
+    setIsRatingModalVisible(false);
+    
+    if (success) {
+      Alert.alert("Thành công", "Cảm ơn bạn đã gửi đánh giá công thức!");
+      loadData(); // Tải lại để cập nhật điểm
+    } else {
+      Alert.alert("Lỗi", "Không thể gửi đánh giá lúc này, vui lòng thử lại sau.");
+    }
   };
 
   const renderComment = (comment: CommentInfo, depth: number = 0, isLast: boolean = true) => {
@@ -118,7 +220,7 @@ export default function RecipeDetailScreen() {
                 borderColor: '#ddd'
               }} />
             )}
-            
+
             {/* Đường cong (chữ L) chĩa vào avatar */}
             <View style={{
               position: 'absolute',
@@ -135,13 +237,15 @@ export default function RecipeDetailScreen() {
         )}
 
         <View style={styles.commentItem}>
-          {comment.user?.avatar ? (
-            <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatarImage} />
-          ) : (
-            <View style={styles.commentAvatar}>
-              <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
-            </View>
-          )}
+          <TouchableOpacity onPress={() => comment.user?.id && router.push(`/user/${comment.user.id}` as any)}>
+            {comment.user?.avatar ? (
+              <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatarImage} />
+            ) : (
+              <View style={styles.commentAvatar}>
+                <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0) || 'U'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.commentContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.commentUser}>{comment.user?.name || 'User'}</Text>
@@ -152,8 +256,8 @@ export default function RecipeDetailScreen() {
               )}
             </View>
             <Text style={styles.commentText}>{comment.content}</Text>
-            <TouchableOpacity 
-              style={{ marginTop: 4 }} 
+            <TouchableOpacity
+              style={{ marginTop: 4 }}
               onPress={() => setReplyTo({ id: comment.id, name: comment.user?.name || 'User' })}
             >
               <Text style={styles.replyBtnText}>Trả lời</Text>
@@ -162,7 +266,7 @@ export default function RecipeDetailScreen() {
         </View>
         {comment.replies && comment.replies.length > 0 && (
           <View style={{ marginTop: 8, marginLeft: 42 }}>
-            {comment.replies.map((reply, index) => 
+            {comment.replies.map((reply, index) =>
               renderComment(reply, depth + 1, index === comment.replies!.length - 1)
             )}
           </View>
@@ -186,136 +290,206 @@ export default function RecipeDetailScreen() {
     instructionsList = typeof recipe.instructions === 'string' ? JSON.parse(recipe.instructions) : (recipe.instructions || []);
   } catch (e) { }
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ flex: 1 }}>
         {/* HERO SECTION */}
         <View style={styles.heroContainer}>
           <Image source={{ uri: recipe.image }} style={styles.heroImage} />
-
-          <View style={styles.heroOverlay}>
-            <View style={styles.timeTag}>
-              <Feather name="clock" size={14} color="#fff" />
-              <Text style={styles.timeText}>{recipe.cook_time_minutes || 15} mins</Text>
-            </View>
-            <Text style={styles.heroTitle}>{recipe.title.toUpperCase()}</Text>
-
-            <View style={styles.tagsContainer}>
-              <View style={styles.categoryTag}>
-                <Text style={styles.categoryTagText}>🍰 {recipe.category || 'Dessert'}</Text>
-              </View>
-            </View>
-          </View>
           {/* BACK BUTTON */}
           <TouchableOpacity
-            style={[styles.backBtn, { top: Platform.OS === 'android' ? (StatusBar.currentHeight || 20) + 10 : 50 }]}
+            style={[styles.backBtn, { top: Platform.OS === 'android' ? (StatusBar.currentHeight || 20) + 12 : 50 }]}
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={24} color="#000" />
           </TouchableOpacity>
+          {recipe.author?.is_self && (
+            <TouchableOpacity
+              style={[styles.backBtn, { right: 16, left: 'auto', top: Platform.OS === 'android' ? (StatusBar.currentHeight || 20) + 12 : 50 }]}
+              onPress={() => setIsEditModalVisible(true)}
+            >
+              <Ionicons name="pencil" size={20} color="#000" />
+            </TouchableOpacity>
+          )}
         </View>
-        {/* ACTION BAR */}
-        <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="bookmark" size={22} color="#f04d4f" />
-            <Text style={styles.actionText}>{recipe.save_count || 0}</Text>
+
+        {/* FLOATING TITLE OVERLAP CARD */}
+        <View style={styles.floatingTitleCard}>
+          <View style={styles.metaRow}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>🍰 {recipe.category || 'Món ăn'}</Text>
+            </View>
+            <View style={styles.timeBadge}>
+              <Feather name="clock" size={14} color="#666" style={{ marginRight: 4 }} />
+              <Text style={styles.timeBadgeText}>{recipe.cook_time_minutes || 15} phút</Text>
+            </View>
+          </View>
+          
+          <Text style={styles.recipeTitleText}>{recipe.title}</Text>
+        </View>
+
+        {/* ACTION BAR CAPSULE */}
+        <View style={styles.floatingActionBar}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setIsSaveModalVisible(true)}>
+            <Ionicons name={recipe.is_in_collection ? "bookmark" : "bookmark-outline"} size={20} color={recipe.is_in_collection ? "#fe2c55" : "#444"} />
+            <Text style={styles.actionText}>Lưu sổ tay</Text>
           </TouchableOpacity>
-          <View style={styles.divider} />
-          <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="star" size={22} color="#555" />
-            <Text style={styles.actionText}>Đánh giá</Text>
+          <View style={styles.actionBarDivider} />
+          
+          <TouchableOpacity style={styles.actionBtn} onPress={() => { setSelectedRating(0); setRatingComment(''); setIsRatingModalVisible(true); }}>
+            <Ionicons name="star" size={20} color="#F4B400" />
+            <Text style={styles.actionText}>
+              {recipe.ratings_avg ? recipe.ratings_avg.toFixed(1) : "5.0"} 
+              <Text style={styles.actionTextSub}> ({recipe.ratings_count || 0})</Text>
+            </Text>
           </TouchableOpacity>
-          <View style={styles.divider} />
+          <View style={styles.actionBarDivider} />
+          
           <TouchableOpacity style={styles.actionBtn}>
-            <Feather name="send" size={22} color="#555" />
+            <Ionicons name="share-social-outline" size={20} color="#444" />
             <Text style={styles.actionText}>Chia sẻ</Text>
           </TouchableOpacity>
         </View>
-        {/* AUTHOR SECTION */}
-        <View style={styles.authorSection}>
-          <View style={styles.authorInfoLeft}>
-            {recipe.author?.avatar ? (
-              <Image source={{ uri: recipe.author.avatar }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarText}>{recipe.author?.name?.charAt(0) || 'U'}</Text>
+
+        {/* AUTHOR CARD SECTION */}
+        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <View style={styles.authorCard}>
+            <TouchableOpacity 
+              style={styles.authorInfoLeft}
+              onPress={() => recipe.author?.id && router.push(`/user/${recipe.author.id}` as any)}
+            >
+              {recipe.author?.avatar ? (
+                <Image source={{ uri: recipe.author.avatar }} style={styles.authorAvatar} />
+              ) : (
+                <View style={styles.authorAvatarPlaceholder}>
+                  <Text style={styles.authorAvatarText}>{recipe.author?.name?.charAt(0) || 'U'}</Text>
+                </View>
+              )}
+              <View>
+                <Text style={styles.authorNameText}>{recipe.author?.name || 'Đầu bếp'}</Text>
+                <Text style={styles.authorHandleText}>{recipe.author?.handle || '@user'}</Text>
               </View>
+            </TouchableOpacity>
+            {!recipe.author?.is_self && (
+              <TouchableOpacity
+                style={[
+                  styles.followBtn,
+                  recipe.author?.is_following && styles.followingBtn
+                ]}
+                onPress={handleToggleFollow}
+                disabled={followLoading}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color={recipe.author?.is_following ? "#888" : "#fff"} />
+                ) : (
+                  <Text style={[
+                    styles.followBtnText,
+                    recipe.author?.is_following && styles.followingBtnText
+                  ]}>
+                    {recipe.author?.is_following ? 'Đang follow' : 'Follow'}
+                  </Text>
+                )}
+              </TouchableOpacity>
             )}
-            <View>
-              <Text style={styles.authorName}>{recipe.author?.name || 'Unknown User'}</Text>
-              <Text style={styles.authorHandle}>{recipe.author?.handle || '@user'}</Text>
-            </View>
           </View>
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>Follow</Text>
-          </TouchableOpacity>
         </View>
-        {/* TABS */}
-        <View style={styles.tabContainer}>
+
+        {/* SEGMENTED CONTROL TABS */}
+        <View style={styles.segmentedTabContainer}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'recipe' && styles.tabBtnActive]}
+            style={[styles.segmentTab, activeTab === 'recipe' && styles.segmentTabActive]}
             onPress={() => setActiveTab('recipe')}
           >
-            <Text style={[styles.tabText, activeTab === 'recipe' && styles.tabTextActive]}>công thức</Text>
+            <Text style={[styles.segmentTabText, activeTab === 'recipe' && styles.segmentTabTextActive]}>Công thức</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'comments' && styles.tabBtnActive]}
+            style={[styles.segmentTab, activeTab === 'comments' && styles.segmentTabActive]}
             onPress={() => setActiveTab('comments')}
           >
-            <Text style={[styles.tabText, activeTab === 'comments' && styles.tabTextActive]}>bình luận</Text>
+            <Text style={[styles.segmentTabText, activeTab === 'comments' && styles.segmentTabTextActive]}>Bình luận</Text>
           </TouchableOpacity>
         </View>
+
         {/* CONTENT */}
         <View style={styles.contentContainer}>
           {activeTab === 'recipe' ? (
-            <View>
+            <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
               {/* ORIGINAL RECIPE BADGE */}
               <View style={styles.originalBadge}>
-                <Text style={styles.originalBadgeText}>Original Recipe</Text>
+                <Ionicons name="ribbon-outline" size={16} color="#e056fd" style={{ marginRight: 4 }} />
+                <Text style={styles.originalBadgeText}>Công thức độc quyền</Text>
               </View>
-              {/* INGREDIENTS */}
-              <Text style={styles.sectionTitle}>Nguyên liệu</Text>
-              <View style={styles.ingredientsList}>
+
+              {/* INGREDIENTS INTERACTIVE CHECKLIST */}
+              <Text style={styles.sectionTitle}>Nguyên liệu cần chuẩn bị</Text>
+              <View style={styles.ingredientsBox}>
                 {ingredientsList.length > 0 ? ingredientsList.map((ing, idx) => {
                   let parsedIng = ing;
                   if (typeof ing === 'string') {
-                    try { parsedIng = JSON.parse(ing); } catch (e) {}
+                    try { parsedIng = JSON.parse(ing); } catch (e) { }
                   }
                   const text = typeof parsedIng === 'string' ? parsedIng : (parsedIng.name || parsedIng.description || JSON.stringify(parsedIng));
+                  const isChecked = !!checkedIngredients[idx];
                   return (
-                    <View key={idx} style={styles.ingredientRow}>
-                      <Text style={styles.ingredientDot}>•</Text>
-                      <Text style={styles.ingredientText}>{text}</Text>
-                    </View>
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.ingredientCheckRow}
+                      onPress={() => toggleIngredient(idx)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={isChecked ? "checkbox" : "square-outline"}
+                        size={20}
+                        color={isChecked ? "#fe2c55" : "#888"}
+                        style={{ marginRight: 10 }}
+                      />
+                      <Text style={[styles.ingredientText, isChecked && styles.ingredientTextChecked]}>
+                        {text}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 }) : (
                   <Text style={styles.emptyText}>Chưa có thông tin nguyên liệu</Text>
                 )}
               </View>
-              {/* INSTRUCTIONS */}
-              <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Cách làm</Text>
-              <View style={styles.instructionsList}>
+
+              {/* INSTRUCTIONS STEP CARDS */}
+              <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Hướng dẫn các bước nấu</Text>
+              <View style={styles.stepsBox}>
                 {instructionsList.length > 0 ? instructionsList.map((step, idx) => {
                   let parsedStep = step;
                   if (typeof step === 'string') {
-                    try { parsedStep = JSON.parse(step); } catch (e) {}
+                    try { parsedStep = JSON.parse(step); } catch (e) { }
                   }
                   const text = typeof parsedStep === 'string' ? parsedStep : (parsedStep.description || parsedStep.text || JSON.stringify(parsedStep));
+                  const isCompleted = !!completedSteps[idx];
                   return (
-                    <View key={idx} style={styles.stepRow}>
-                      <View style={styles.stepCircle}>
-                        <Text style={styles.stepCircleText}>{parsedStep.order || idx + 1}</Text>
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.stepCard, isCompleted && styles.stepCardCompleted]}
+                      onPress={() => toggleStep(idx)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.stepHeaderRow}>
+                        <Text style={[styles.stepNumberText, isCompleted && styles.stepNumberTextCompleted]}>
+                          {String(idx + 1).padStart(2, '0')}
+                        </Text>
+                        <Ionicons
+                          name={isCompleted ? "checkmark-circle" : "ellipse-outline"}
+                          size={22}
+                          color={isCompleted ? "#2ec4b6" : "#ccc"}
+                        />
                       </View>
-                      <View style={styles.stepTextContainer}>
-                        <Text style={styles.stepText}>{text}</Text>
-                      </View>
-                    </View>
+                      <Text style={[styles.stepTextContent, isCompleted && styles.stepTextContentCompleted]}>
+                        {text}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 }) : (
                   <Text style={styles.emptyText}>Chưa có hướng dẫn cách làm</Text>
@@ -337,6 +511,65 @@ export default function RecipeDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* RATING MODAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isRatingModalVisible}
+        onRequestClose={() => setIsRatingModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Đánh giá công thức</Text>
+              <Text style={styles.modalSubtitle}>Bạn cảm thấy món ăn này thế nào?</Text>
+
+              <View style={styles.starsSelectionRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => setSelectedRating(star)} activeOpacity={0.7} style={styles.starBtn}>
+                    <Ionicons
+                      name={selectedRating >= star ? "star" : "star-outline"}
+                      size={40}
+                      color={selectedRating >= star ? "#FFD700" : "#ccc"}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.ratingTextInput}
+                placeholder="Chia sẻ thêm cảm nhận của bạn (Không bắt buộc)..."
+                value={ratingComment}
+                onChangeText={setRatingComment}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.modalCancelBtn]}
+                  onPress={() => setIsRatingModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.modalSubmitBtn, selectedRating === 0 && { opacity: 0.5 }]}
+                  disabled={selectedRating === 0 || isSubmittingRating}
+                  onPress={handleSubmitRating}
+                >
+                  {isSubmittingRating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalSubmitText}>Gửi đánh giá</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* FOOTER INPUT FOR COMMENTS */}
       {activeTab === 'comments' && (
         <View style={styles.commentInputWrapper}>
           {replyTo && (
@@ -356,7 +589,7 @@ export default function RecipeDetailScreen() {
               onChangeText={setCommentText}
               multiline
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.postCommentBtn, (!commentText.trim() || isPosting) && { opacity: 0.5 }]}
               disabled={!commentText.trim() || isPosting}
               onPress={handlePostComment}
@@ -370,13 +603,40 @@ export default function RecipeDetailScreen() {
           </View>
         </View>
       )}
+
+      {/* EDIT MODAL */}
+      <CreatePostModal
+        visible={isEditModalVisible}
+        onClose={() => setIsEditModalVisible(false)}
+        isEditMode={true}
+        recipeId={id as string}
+        initialData={recipe}
+        onPostCreated={() => {
+          setIsEditModalVisible(false);
+          loadData();
+        }}
+      />
+
+      <SaveToCollectionModal
+        visible={isSaveModalVisible}
+        onClose={() => setIsSaveModalVisible(false)}
+        recipeId={id as string}
+        onSavedChange={(isSavedInAny) => {
+          setRecipe((prev) => {
+            if (!prev || prev.is_in_collection === isSavedInAny) return prev;
+            DeviceEventEmitter.emit('recipeSavedStateChanged', { recipeId: Number(id), isSaved: isSavedInAny });
+            return { ...prev, is_in_collection: isSavedInAny };
+          });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fafafa',
   },
   loadingArea: {
     flex: 1,
@@ -386,55 +646,14 @@ const styles = StyleSheet.create({
   },
   heroContainer: {
     width: width,
-    height: width * 1.25, // Khá cao
+    height: width * 0.95, // Giảm chiều cao xuống một chút để cân bằng tỉ lệ 4:3 đẹp mắt hơn
     position: 'relative',
+    backgroundColor: '#000',
   },
   heroImage: {
     width: '100%',
     height: '100%',
-  },
-  heroOverlay: {
-    position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-  },
-  timeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  timeText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 34,
-    marginBottom: 12,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-  },
-  categoryTag: {
-    backgroundColor: '#e6f0ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  categoryTagText: {
-    color: '#4b7bec',
-    fontWeight: 'bold',
-    fontSize: 13,
+    opacity: 0.95,
   },
   backBtn: {
     position: 'absolute',
@@ -442,196 +661,301 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  floatingTitleCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 8,
+    marginTop: -28, // Đè nhẹ lên ảnh bìa
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
   },
-  actionBar: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  categoryBadge: {
+    backgroundColor: '#f0f3ff',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  categoryBadgeText: {
+    color: '#3b5998',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  timeBadgeText: {
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  recipeTitleText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#1a1a1a',
+    lineHeight: 32,
+    letterSpacing: 0.2,
+  },
+  floatingActionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 14,
+    paddingVertical: 14,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
   },
   actionText: {
     marginLeft: 6,
-    color: '#555',
-    fontWeight: '600',
-    fontSize: 15,
+    color: '#222',
+    fontWeight: '700',
+    fontSize: 14,
   },
-  divider: {
+  actionTextSub: {
+    fontWeight: '500',
+    color: '#777',
+    fontSize: 12,
+  },
+  actionBarDivider: {
     width: 1,
     height: 20,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#eee',
   },
-  authorSection: {
+  authorCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#fff',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#f1f2f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   authorInfoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  authorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     marginRight: 12,
   },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ff5a5f',
+  authorAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fe2c55',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  avatarText: {
+  authorAvatarText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 18,
   },
-  authorName: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#111',
+  authorNameText: {
+    fontWeight: '800',
+    fontSize: 15,
+    color: '#1a1a1a',
   },
-  authorHandle: {
+  authorHandleText: {
     color: '#888',
-    fontSize: 13,
+    fontSize: 12,
+    marginTop: 2,
   },
-  followButton: {
-    backgroundColor: '#ff5a5f',
+  followBtn: {
+    backgroundColor: '#fe2c55',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  followButtonText: {
+  followBtnText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 13,
   },
-  tabContainer: {
+  followingBtn: {
+    backgroundColor: '#f1f2f5',
+  },
+  followingBtnText: {
+    color: '#555',
+  },
+  segmentedTabContainer: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    marginTop: 10,
+    backgroundColor: '#f1f2f6',
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 4,
+    borderRadius: 24,
   },
-  tabBtn: {
+  segmentTab: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
+    borderRadius: 20,
   },
-  tabBtnActive: {
-    borderBottomColor: '#ff5a5f',
+  segmentTabActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  tabText: {
-    color: '#999',
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  segmentTabText: {
+    color: '#777',
+    fontWeight: '700',
+    fontSize: 14,
   },
-  tabTextActive: {
-    color: '#333',
+  segmentTabTextActive: {
+    color: '#111',
   },
   contentContainer: {
-    backgroundColor: '#fafafa',
     minHeight: 400,
   },
   originalBadge: {
-    backgroundColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fbf0ff',
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    marginTop: 20,
-    marginBottom: 20,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
   },
   originalBadgeText: {
-    color: '#555',
-    fontWeight: '600',
+    color: '#b33939',
+    fontWeight: '700',
+    fontSize: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  ingredientsList: {
-    paddingHorizontal: 16,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1a1a1a',
     marginBottom: 12,
-    alignItems: 'flex-start',
+    letterSpacing: 0.1,
   },
-  ingredientDot: {
-    fontSize: 20,
-    color: '#ff5a5f',
-    lineHeight: 24,
-    marginRight: 8,
+  ingredientsBox: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f1f2f6',
+  },
+  ingredientCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#f5f5f5',
   },
   ingredientText: {
-    fontSize: 16,
-    color: '#444',
-    lineHeight: 24,
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
     flex: 1,
+    lineHeight: 22,
   },
-  instructionsList: {
-    paddingHorizontal: 16,
+  ingredientTextChecked: {
+    textDecorationLine: 'line-through',
+    color: '#aaa',
   },
-  stepRow: {
-    flexDirection: 'row',
+  stepsBox: {
+    marginTop: 4,
+  },
+  stepCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f1f2f6',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 2,
   },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#ff5a5f',
-    justifyContent: 'center',
+  stepCardCompleted: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#e8e8e8',
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 10,
   },
-  stepCircleText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
+  stepNumberText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#fe2c55',
   },
-  stepTextContainer: {
-    flex: 1,
+  stepNumberTextCompleted: {
+    color: '#bbb',
   },
-  stepText: {
+  stepTextContent: {
     fontSize: 15,
     color: '#333',
     lineHeight: 22,
+    fontWeight: '400',
+  },
+  stepTextContentCompleted: {
+    color: '#bbb',
+    textDecorationLine: 'line-through',
   },
   emptyText: {
-    color: '#888',
+    color: '#999',
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 20,
@@ -640,9 +964,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 300,
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
   commentsList: {
-    padding: 16,
+    paddingVertical: 16,
     flex: 1,
     paddingBottom: 40,
   },
@@ -653,7 +978,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ff5a5f',
+    backgroundColor: '#fe2c55',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -671,42 +996,42 @@ const styles = StyleSheet.create({
   },
   commentContent: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 10,
-    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    padding: 12,
+    borderRadius: 16,
   },
   commentUser: {
     fontWeight: 'bold',
     fontSize: 13,
-    color: '#333',
+    color: '#1a1a1a',
     marginRight: 6,
   },
   authorBadge: {
-    backgroundColor: '#ff5a5f',
+    backgroundColor: '#fe2c55',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
   authorBadgeText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
   },
   commentText: {
     fontSize: 14,
-    color: '#444',
+    color: '#333',
     lineHeight: 20,
-    marginTop: 2,
+    marginTop: 4,
   },
   replyBtnText: {
-    color: '#888',
+    color: '#666',
     fontSize: 12,
     fontWeight: 'bold',
   },
   commentInputWrapper: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#eee',
   },
   replyingToContainer: {
     flexDirection: 'row',
@@ -723,16 +1048,94 @@ const styles = StyleSheet.create({
   },
   commentInputContainer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
     alignItems: 'flex-end',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#222',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  starsSelectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  starBtn: {
+    paddingHorizontal: 4,
+  },
+  ratingTextInput: {
+    width: '100%',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 16,
+    padding: 16,
+    height: 100,
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalActionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    backgroundColor: '#f0f0f0',
+    marginRight: 10,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#666',
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#fe2c55',
+    marginLeft: 10,
+  },
+  modalSubmitText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
   commentInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
+    backgroundColor: '#f1f2f6',
+    borderRadius: 24,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
     minHeight: 40,
     maxHeight: 100,
     fontSize: 15,
@@ -742,10 +1145,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ff5a5f',
+    backgroundColor: '#fe2c55',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
     marginBottom: 2,
   }
 });
+

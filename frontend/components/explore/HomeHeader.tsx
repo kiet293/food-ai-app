@@ -43,7 +43,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ userAvatar, fullName }) 
 
       <TouchableOpacity style={styles.notificationWrap}>
         <Ionicons name="notifications-outline" size={22} color="#333" />
-        <View style={styles.notificationDot} />
       </TouchableOpacity>
     </View>
   );
@@ -97,13 +96,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  notificationDot: {
-    position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ff4757',
-  },
+
 });

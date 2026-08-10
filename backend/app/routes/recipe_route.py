@@ -7,11 +7,12 @@ import cloudinary
 import cloudinary.uploader
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from typing import Optional
 from app.models.database import get_db
 from app.models.recipe_model import RecipeDB, RecipeStatsDB, RatingDB, CommentDB, CategoryDB, RecipeCategoryDB, TagDB, RecipeTagDB
-from app.schemas.recipe import AIAnalysisResult # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
+from app.schemas.recipe import AIAnalysisResult, RateRecipeRequest # Tái sử dụng schema cũ để làm hợp đồng nhận dữ liệu
 from app.models.user_model import UserDB
-from app.utils.deps import get_current_user
+from app.utils.deps import get_current_user, get_optional_current_user
 from app.crud.recipe_stats import record_recipe_save
 from app.utils.response import success_response, CustomException
 import unicodedata
@@ -62,22 +63,46 @@ def delete_image_from_cloudinary(image_url: str):
         print(f"❌ Lỗi khi xóa ảnh cũ trên Cloudinary: {e}")
         # Không throw lỗi để tiến trình cập nhật vẫn tiếp tục dù xóa ảnh cũ thất bại
 
-def format_recipe_summary(recipe: RecipeDB):
+def format_recipe_summary(recipe: RecipeDB, current_user: Optional[UserDB] = None):
     author_info = None
     if recipe.author:
+        from sqlalchemy.orm import Session
+        db = Session.object_session(recipe)
+        is_following = False
+        is_self = False
+        if current_user and db:
+            is_self = current_user.id == recipe.author.id
+            if not is_self:
+                from app.models.user_model import FollowDB
+                is_following = db.query(FollowDB).filter(
+                    FollowDB.follower_id == current_user.id,
+                    FollowDB.following_id == recipe.author.id
+                ).first() is not None
+
         author_info = {
             "id": recipe.author.id,
             "name": recipe.author.full_name or recipe.author.username,
             "handle": f"@{recipe.author.username}",
-            "avatar": recipe.author.avatar
+            "avatar": recipe.author.avatar,
+            "is_following": is_following,
+            "is_self": is_self
         }
-    
+
     ratings_list = [r.score for r in recipe.ratings] if recipe.ratings else []
     ratings_avg = sum(ratings_list) / len(ratings_list) if ratings_list else 0
-    
+
+    is_favorited = False
+    if current_user and recipe.favorites:
+        is_favorited = any(f.user_id == current_user.id for f in recipe.favorites)
+
+    is_in_collection = False
+    if current_user and recipe.collection_associations:
+        is_in_collection = any(assoc.collection and assoc.collection.user_id == current_user.id for assoc in recipe.collection_associations)
+
     return {
         "id": recipe.id,
         "title": recipe.recipe_name,
+        "description": recipe.description,
         "image": recipe.image_url,
         "cook_time_minutes": recipe.cook_time_minutes,
         "difficulty": recipe.difficulty,
@@ -85,10 +110,42 @@ def format_recipe_summary(recipe: RecipeDB):
         "ratings_avg": round(ratings_avg, 1),
         "ratings_count": len(ratings_list),
         "comments_count": len(recipe.comments) if recipe.comments else 0,
-        "save_count": 0, # Tạm thời trả về 0 theo kế hoạch
+        "favorites_count": len(recipe.favorites) if recipe.favorites else 0,
+        "is_favorited": is_favorited,
+        "is_in_collection": is_in_collection,
         "cooked_count": 0, # Tạm thời trả về 0 theo kế hoạch
         "created_at": recipe.created_at.isoformat() if recipe.created_at else None
     }
+
+# API LẤY DANH SÁCH TRENDING RECIPES
+@router.get("/trending")
+def get_trending_recipes(
+    limit: int = 10, 
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    """Lấy danh sách các món ăn đang hot dựa trên trending_score"""
+    try:
+        recipes = db.query(RecipeDB).filter(
+            RecipeDB.is_ai == False
+        ).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
+        
+        results = []
+        for index, recipe in enumerate(recipes):
+            summary = format_recipe_summary(recipe, current_user)
+            # Gắn badge cho top 3 món cao điểm nhất
+            if index < 3:
+                summary["badge"] = "Đang Hot 🚀"
+            results.append(summary)
+            
+        return success_response(data=results, message="Lấy danh sách Trending thành công")
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy Trending Recipes: {e}")
+        raise CustomException(
+            message=f"Lỗi hệ thống khi lấy danh sách Trending",
+            code="FETCH_TRENDING_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # API LƯU CÔNG THỨC VÀO SỔ TAY
 @router.post("/save")
@@ -117,13 +174,31 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
             recipe_name=recipe_data.recipeName,
             ingredients=ingredients_list,
             instructions=recipe_data.instructions,
-            image_url=recipe_data.imageUrl
+            image_url=recipe_data.imageUrl,
+            is_ai=True
         )
 
         # Lưu vào Database
         db.add(new_recipe)
         db.commit()
         db.refresh(new_recipe) # Lấy ID vừa được tạo ra
+
+        # Tự động tạo và thêm vào bộ sưu tập "AI gợi ý"
+        from app.models.collection_model import CollectionDB, CollectionRecipeDB
+        ai_collection = db.query(CollectionDB).filter(
+            CollectionDB.user_id == current_user.id,
+            CollectionDB.name == "AI gợi ý"
+        ).first()
+
+        if not ai_collection:
+            ai_collection = CollectionDB(user_id=current_user.id, name="AI gợi ý")
+            db.add(ai_collection)
+            db.commit()
+            db.refresh(ai_collection)
+        
+        collection_recipe = CollectionRecipeDB(collection_id=ai_collection.id, recipe_id=new_recipe.id)
+        db.add(collection_recipe)
+        db.commit()
 
         # Ghi nhận lượt lưu (Thích) vào bảng thống kê phổ biến
         record_recipe_save(
@@ -134,7 +209,7 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
             image_url=recipe_data.imageUrl
         )
 
-        print(f"💾 Đã lưu thành công món: {new_recipe.recipe_name}")
+        print(f"💾 Đã lưu thành công món: {new_recipe.recipe_name} vào bộ sưu tập AI gợi ý")
         return {"message": "Lưu công thức thành công!", "recipe_id": new_recipe.id}
 
     except Exception as e:
@@ -344,11 +419,20 @@ def get_categories(db: Session = Depends(get_db)):
 def get_explore_grid(
     cursor: int = Query(None, description="ID của công thức cuối cùng ở lần tải trước"),
     limit: int = Query(18, ge=1, le=50, description="Số lượng ảnh cần lấy"),
+    tag: Optional[str] = Query(None, description="Tên tag để lọc"),
     db: Session = Depends(get_db)
 ):
     try:
         # Sắp xếp mới nhất lên đầu (dựa vào ID giảm dần cho nhanh và chính xác)
-        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
+        
+        if tag and tag != "Tất Cả":
+            tag_slug = slugify(tag)
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
         
         # Nếu có cursor, chỉ lấy các bài viết cũ hơn bài viết có ID = cursor
         if cursor:
@@ -389,20 +473,30 @@ def get_explore_grid(
 def get_explore_feed(
     start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
     limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
-    db: Session = Depends(get_db)
+    tag: Optional[str] = Query(None, description="Tên tag để lọc (tùy chọn)"),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
-        query = db.query(RecipeDB).order_by(RecipeDB.id.desc())
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
         
+        if tag:
+            tag_slug = slugify(tag.replace('#', '')) # Remove # if present
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
+
         # Lấy từ start_id trở xuống
         if start_id:
             query = query.filter(RecipeDB.id <= start_id)
-            
+
         recipes = query.limit(limit).all()
-        
+
         next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
-        
-        result_list = [format_recipe_summary(r) for r in recipes]
+
+        result_list = [format_recipe_summary(r, current_user) for r in recipes]
         
         return success_response(
             data={
@@ -418,10 +512,68 @@ def get_explore_feed(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# ====================================================================================================
+# API FOLLOWING FEED (Sử dụng Cursor-based pagination, chỉ lấy công thức từ người dùng đã follow)
+# ====================================================================================================
+@router.get("/following-feed")
+def get_following_feed(
+    start_id: int = Query(None, description="ID của món ăn được click (Nếu có)"),
+    limit: int = Query(5, ge=1, le=20, description="Số lượng bài viết cần lấy"),
+    tag: Optional[str] = Query(None, description="Tên tag để lọc (tùy chọn)"),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        from app.models.user_model import FollowDB
+        query = db.query(RecipeDB).join(
+            FollowDB, 
+            RecipeDB.user_id == FollowDB.following_id
+        ).filter(
+            FollowDB.follower_id == current_user.id,
+            RecipeDB.is_ai == False
+        )
+        
+        if tag:
+            tag_slug = slugify(tag.replace('#', '')) # Remove # if present
+            query = query.join(RecipeTagDB, RecipeTagDB.recipe_id == RecipeDB.id)\
+                         .join(TagDB, TagDB.id == RecipeTagDB.tag_id)\
+                         .filter(TagDB.slug == tag_slug)
+                         
+        query = query.order_by(RecipeDB.id.desc())
+
+        # Lấy từ start_id trở xuống
+        if start_id:
+            query = query.filter(RecipeDB.id <= start_id)
+
+        recipes = query.limit(limit).all()
+
+        next_cursor = recipes[-1].id - 1 if len(recipes) == limit else None
+
+        result_list = [format_recipe_summary(r, current_user) for r in recipes]
+        
+        return success_response(
+            data={
+                "items": result_list,
+                "next_cursor": next_cursor
+            }
+        )
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy following feed: {str(e)}")
+        raise CustomException(
+            message=f"Lỗi khi lấy danh sách following feed: {str(e)}",
+            code="FOLLOWING_FEED_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 
 # API LẤY CHI TIẾT CÔNG THỨC NẤU ĂN
 @router.get("/{recipe_id}")
-def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
+def get_recipe_details(
+    recipe_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
     try:
         # Tìm công thức trong DB
         recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
@@ -433,13 +585,20 @@ def get_recipe_details(recipe_id: int, db: Session = Depends(get_db)):
             )
         
         # Sử dụng hàm hỗ trợ để lấy các trường cơ bản
-        recipe_data = format_recipe_summary(recipe)
+        recipe_data = format_recipe_summary(recipe, current_user)
         
         # Bổ sung thêm các trường chi tiết (description, ingredients, instructions, servings)
         recipe_data["description"] = recipe.description
         recipe_data["ingredients"] = recipe.ingredients
         recipe_data["instructions"] = recipe.instructions
         recipe_data["servings"] = recipe.servings
+        
+        # Fetch category and tags
+        recipe_category = db.query(CategoryDB).join(RecipeCategoryDB).filter(RecipeCategoryDB.recipe_id == recipe.id).first()
+        recipe_data["category_name"] = recipe_category.name if recipe_category else None
+        
+        tags = db.query(TagDB).join(RecipeTagDB).filter(RecipeTagDB.recipe_id == recipe.id).all()
+        recipe_data["tags"] = [t.name for t in tags]
         
         # Bổ sung nội dung chi tiết bình luận dạng cây (comments array)
         comments_dict = {}
@@ -499,7 +658,7 @@ def get_recipes(
         if sort_by not in ["newest", "popular", "top_rated"]:
             sort_by = "newest"
 
-        query = db.query(RecipeDB)
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
 
         # Xử lý sort
         if sort_by == "newest":
@@ -582,6 +741,8 @@ def update_recipe(
     cook_time_minutes: int = Form(None),
     servings: int = Form(None),
     difficulty: str = Form(None),
+    category_name: str = Form(None),
+    tags: str = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -648,6 +809,35 @@ def update_recipe(
         if difficulty is not None:
             recipe.difficulty = difficulty
 
+        # Xử lý Category
+        if category_name is not None:
+            db.query(RecipeCategoryDB).filter(RecipeCategoryDB.recipe_id == recipe.id).delete()
+            category = db.query(CategoryDB).filter(CategoryDB.name == category_name).first()
+            if category:
+                db.add(RecipeCategoryDB(recipe_id=recipe.id, category_id=category.id))
+
+        # Xử lý Tags
+        if tags is not None:
+            try:
+                db.query(RecipeTagDB).filter(RecipeTagDB.recipe_id == recipe.id).delete()
+                parsed_tags = json.loads(tags)
+                if isinstance(parsed_tags, list):
+                    for tag_name in parsed_tags:
+                        tag_name = tag_name.strip()
+                        if not tag_name: continue
+                        tag_slug = slugify(tag_name)
+                        existing_tag = db.query(TagDB).filter(TagDB.slug == tag_slug).first()
+                        if not existing_tag:
+                            existing_tag = TagDB(name=tag_name, slug=tag_slug, usage_count=1)
+                            db.add(existing_tag)
+                            db.commit()
+                            db.refresh(existing_tag)
+                        else:
+                            existing_tag.usage_count += 1
+                        db.add(RecipeTagDB(recipe_id=recipe.id, tag_id=existing_tag.id))
+            except json.JSONDecodeError as e:
+                print(f"Lỗi parse tags JSON: {e}")
+
         # Lưu thay đổi
         db.commit()
         db.refresh(recipe)
@@ -674,4 +864,56 @@ def update_recipe(
             message="Lỗi hệ thống khi cập nhật công thức",
             code="UPDATE_RECIPE_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@router.post("/{recipe_id}/rate")
+def rate_recipe(
+    recipe_id: int, 
+    request: RateRecipeRequest, 
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # 1. Kiểm tra công thức có tồn tại không
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=404
+            )
+            
+        # 2. Xử lý logic đánh giá
+        existing_rating = db.query(RatingDB).filter(
+            RatingDB.recipe_id == recipe_id, 
+            RatingDB.user_id == current_user.id
+        ).first()
+        
+        if existing_rating:
+            existing_rating.score = request.score
+        else:
+            new_rating = RatingDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                score=request.score
+            )
+            db.add(new_rating)
+            
+        # 3. Xử lý logic comment nếu có nhập chữ
+        if request.comment and request.comment.strip():
+            new_comment = CommentDB(
+                recipe_id=recipe_id,
+                user_id=current_user.id,
+                content=request.comment.strip()
+            )
+            db.add(new_comment)
+            
+        db.commit()
+        return success_response(message="Đánh giá công thức thành công!")
+    except Exception as e:
+        db.rollback()
+        raise CustomException(
+            message=f"Lỗi khi lưu đánh giá: {e}",
+            code="RATE_RECIPE_ERROR",
+            status_code=500
         )

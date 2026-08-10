@@ -1,0 +1,234 @@
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from app.models.database import get_db
+from app.models.user_model import UserDB, FollowDB
+from app.models.recipe_model import RecipeDB, FavoriteDB
+from app.models.reel_model import ReelDB, ReelLikeDB
+from app.models.collection_model import CollectionDB, CollectionRecipeDB
+from app.schemas.user import ChefResponse
+from app.utils.deps import get_optional_current_user
+from app.utils.response import success_response, CustomException
+
+router = APIRouter()
+
+DEFAULT_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80"
+
+def _serialize_follow_user(db: Session, other_user: UserDB, current_user: Optional[UserDB]) -> dict:
+    is_following = False
+    is_self = False
+    if current_user:
+        is_self = current_user.id == other_user.id
+        if not is_self:
+            is_following = db.query(FollowDB).filter(
+                FollowDB.follower_id == current_user.id,
+                FollowDB.following_id == other_user.id
+            ).first() is not None
+    return {
+        "id": str(other_user.id),
+        "name": other_user.full_name or other_user.username,
+        "handle": f"@{other_user.username}",
+        "avatar": other_user.avatar or DEFAULT_AVATAR,
+        "is_following": is_following,
+        "is_self": is_self,
+    }
+
+@router.get("/popular-chefs", response_model=dict)
+def get_popular_chefs(db: Session = Depends(get_db)):
+    chefs = db.query(UserDB).order_by(UserDB.follower_count.desc()).limit(20).all()
+    # Serialize to standard response
+    chef_data = [
+        {
+            "id": str(chef.id),
+            "name": chef.full_name or chef.username,
+            "avatar": chef.avatar or "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80",
+            "isFollowing": False,
+            "follower_count": chef.follower_count
+        }
+        for chef in chefs
+    ]
+    return success_response(data=chef_data, message="Fetched popular chefs successfully")
+
+@router.get("/{user_id}/profile")
+def get_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Kiểm tra người dùng hiện tại đã theo dõi người này chưa (nếu đã đăng nhập)
+    is_following = False
+    is_self = False
+    if current_user:
+        is_self = current_user.id == user.id
+        if not is_self:
+            is_following = db.query(FollowDB).filter(
+                FollowDB.follower_id == current_user.id,
+                FollowDB.following_id == user.id
+            ).first() is not None
+
+    # Thống kê số lượng Follower & Following thực tế
+    following_count = db.query(FollowDB).filter(FollowDB.follower_id == user.id).count()
+    followers_in_db = db.query(FollowDB).filter(FollowDB.following_id == user.id).count()
+    follower_count = max(followers_in_db, user.follower_count or 0)
+
+    # Thống kê tổng số lượt thích (heart) nhận được trên tất cả Reels của người dùng này
+    total_likes_count = db.query(ReelLikeDB).join(ReelDB).filter(ReelDB.user_id == user.id).count()
+
+    # Lấy danh sách Reels chính chủ do người dùng tự đăng
+    my_reels_db = db.query(ReelDB).filter(ReelDB.user_id == user.id).order_by(ReelDB.created_at.desc()).all()
+    my_reels = []
+    for r in my_reels_db:
+        likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+        my_reels.append({
+            "id": f"reel-{r.id}",
+            "db_id": r.id,
+            "videoUrl": r.video_url,
+            "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
+            "caption": r.caption or "",
+            "likesCount": likes_cnt,
+            "viewsCount": (r.id * 137) % 900 + 120
+        })
+
+    # Lấy danh sách Reels người dùng đã thích
+    liked_reels_db = db.query(ReelDB).join(ReelLikeDB).filter(ReelLikeDB.user_id == user.id).order_by(ReelLikeDB.created_at.desc()).all()
+    liked_reels = []
+    for r in liked_reels_db:
+        likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+        liked_reels.append({
+            "id": f"reel-{r.id}",
+            "db_id": r.id,
+            "videoUrl": r.video_url,
+            "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
+            "caption": r.caption or "",
+            "likesCount": likes_cnt,
+            "viewsCount": (r.id * 89) % 800 + 95
+        })
+
+    # Get recent recipes authored by this user
+    recent_recipes = db.query(RecipeDB).filter(
+        RecipeDB.user_id == user_id,
+        RecipeDB.is_ai == False
+    ).order_by(RecipeDB.created_at.desc()).limit(10).all()
+    # Get user's collections
+    collections = db.query(CollectionDB).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.created_at.desc()).all()
+    
+    recent_data = [
+        {
+            "id": str(r.id),
+            "title": r.recipe_name,
+            "image": r.image_url or "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80"
+        } for r in recent_recipes
+    ]
+    
+    collections_data = []
+    for c in collections:
+        count = db.query(CollectionRecipeDB).filter(CollectionRecipeDB.collection_id == c.id).count()
+        # get image from first recipe if any
+        first_cr = db.query(CollectionRecipeDB).filter(CollectionRecipeDB.collection_id == c.id).first()
+        image_url = "https://images.unsplash.com/photo-1490818387583-1b5ba4597389?w=500&q=80"
+        if first_cr and first_cr.recipe and first_cr.recipe.image_url:
+            image_url = first_cr.recipe.image_url
+            
+        collections_data.append({
+            "id": str(c.id),
+            "title": c.name,
+            "count": count,
+            "image": image_url
+        })
+        
+    # Query favorites for "want to make" count
+    want_to_make_count = db.query(FavoriteDB).filter(FavoriteDB.user_id == user_id).count()
+        
+    profile_data = {
+        "id": str(user.id),
+        "name": user.full_name or user.username,
+        "handle": f"@{user.username}",
+        "avatar": user.avatar or "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80",
+        "bio": user.bio or "",
+        "following_count": following_count,
+        "follower_count": follower_count,
+        "total_likes_count": total_likes_count,
+        "is_following": is_following,
+        "is_self": is_self,
+        "recent_recipes": recent_data,
+        "collections": collections_data,
+        "my_reels": my_reels,
+        "liked_reels": liked_reels
+    }
+    
+    return success_response(data=profile_data, message="Fetched user profile successfully")
+
+@router.get("/{user_id}/followers")
+def get_user_followers(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    target = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not target:
+        raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Những người đang follow user_id (follower_id -> following_id == user_id)
+    query = db.query(FollowDB).filter(FollowDB.following_id == user_id).order_by(FollowDB.created_at.desc())
+    total_items = query.count()
+    total_pages = (total_items + limit - 1) // limit if total_items else 0
+    rows = query.offset((page - 1) * limit).limit(limit).all()
+
+    follower_ids = [r.follower_id for r in rows]
+    users_by_id = {u.id: u for u in db.query(UserDB).filter(UserDB.id.in_(follower_ids)).all()}
+    items = [_serialize_follow_user(db, users_by_id[fid], current_user) for fid in follower_ids if fid in users_by_id]
+
+    return success_response(
+        data={
+            "items": items,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "total_items": total_items,
+                "limit": limit
+            }
+        },
+        message="Fetched followers successfully"
+    )
+
+@router.get("/{user_id}/following")
+def get_user_following(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user)
+):
+    target = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not target:
+        raise CustomException(message="User not found", code="USER_NOT_FOUND", status_code=404)
+
+    # Những người mà user_id đang follow (follower_id == user_id -> following_id)
+    query = db.query(FollowDB).filter(FollowDB.follower_id == user_id).order_by(FollowDB.created_at.desc())
+    total_items = query.count()
+    total_pages = (total_items + limit - 1) // limit if total_items else 0
+    rows = query.offset((page - 1) * limit).limit(limit).all()
+
+    following_ids = [r.following_id for r in rows]
+    users_by_id = {u.id: u for u in db.query(UserDB).filter(UserDB.id.in_(following_ids)).all()}
+    items = [_serialize_follow_user(db, users_by_id[fid], current_user) for fid in following_ids if fid in users_by_id]
+
+    return success_response(
+        data={
+            "items": items,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "total_items": total_items,
+                "limit": limit
+            }
+        },
+        message="Fetched following successfully"
+    )

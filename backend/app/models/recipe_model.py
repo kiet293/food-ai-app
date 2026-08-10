@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text  # type: ignore
+from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text, Boolean, Float  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship, backref # type: ignore
 from app.models.database import Base
@@ -16,6 +16,8 @@ class RecipeDB(Base):
     author = relationship("UserDB", backref="recipes")
     comments = relationship("CommentDB", backref="recipe", cascade="all, delete-orphan")
     ratings = relationship("RatingDB", backref="recipe", cascade="all, delete-orphan")
+    favorites = relationship("FavoriteDB", backref="recipe", cascade="all, delete-orphan")
+    collection_associations = relationship("CollectionRecipeDB", back_populates="recipe", cascade="all, delete-orphan")
 
     # Tên món ăn
     recipe_name = Column(String, index=True)
@@ -35,10 +37,15 @@ class RecipeDB(Base):
     servings = Column(Integer, nullable=True)
     difficulty = Column(String, nullable=True)
 
+    # Cột lưu điểm xu hướng (Trending Score)
+    trending_score = Column(Float, default=0.0, index=True)
+    
+    # Đánh dấu công thức do AI sinh ra
+    is_ai = Column(Boolean, default=False, index=True)
+
     # Tự động lưu thời gian tạo và cập nhật
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
 
 class RecipeStatsDB(Base):
     __tablename__ = "recipe_stats"
@@ -67,8 +74,8 @@ class CommentDB(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
-    recipe_id = Column(Integer, ForeignKey("recipes.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     content = Column(Text, nullable=False)
     
     parent_comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
@@ -80,12 +87,15 @@ class CommentDB(Base):
     replies = relationship("CommentDB", backref=backref("parent", remote_side=[id]))
 
 
+from sqlalchemy import UniqueConstraint, Float
+
 class RatingDB(Base):
     __tablename__ = "ratings"
+    __table_args__ = (UniqueConstraint('recipe_id', 'user_id', name='uq_rating_user_recipe'),)
 
     id = Column(Integer, primary_key=True, index=True)
-    recipe_id = Column(Integer, ForeignKey("recipes.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     score = Column(Integer, nullable=False) # VD: từ 1 đến 5 sao
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -123,4 +133,15 @@ class RecipeTagDB(Base):
 
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
     tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class FavoriteDB(Base):
+    __tablename__ = "favorites"
+    __table_args__ = (UniqueConstraint('recipe_id', 'user_id', name='uq_favorite_user_recipe'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("UserDB")

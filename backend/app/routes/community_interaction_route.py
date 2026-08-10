@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, Body, status
+from fastapi import APIRouter, Depends, Body, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.models.database import get_db
-from app.models.recipe_model import RecipeDB, CommentDB, RatingDB
-from app.models.user_model import UserDB
+from app.models.recipe_model import RecipeDB, CommentDB, RatingDB, FavoriteDB
+from app.models.user_model import UserDB, FollowDB
 from app.schemas.recipe import CommentCreate, RatingCreate
 from app.utils.deps import get_current_user
 from app.utils.response import success_response, CustomException
+from app.utils.ws_manager import manager
 
 router = APIRouter(tags=["Community Interaction"])
 
@@ -13,6 +14,7 @@ router = APIRouter(tags=["Community Interaction"])
 @router.post("/recipes/{recipe_id}/comments")
 def add_comment(
     recipe_id: int,
+    background_tasks: BackgroundTasks,
     comment_data: CommentCreate = Body(...),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -54,6 +56,13 @@ def add_comment(
         db.add(new_comment)
         db.commit()
         db.refresh(new_comment)
+
+        total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
+        async def broadcast():
+            payload = {"type": "COMMENT_UPDATE", "recipe_id": recipe_id, "comments_count": total_comments}
+            await manager.broadcast_to_recipe(str(recipe_id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
         
         # Lấy thông tin tác giả bình luận để trả về luôn cho app
         return success_response(
@@ -156,6 +165,7 @@ def update_comment(
 @router.delete("/comments/{comment_id}")
 def delete_comment(
     comment_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -178,8 +188,16 @@ def delete_comment(
             )
 
         # 3. Tiến hành xóa
+        recipe_id = comment.recipe_id
         db.delete(comment)
         db.commit()
+
+        total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
+        async def broadcast():
+            payload = {"type": "COMMENT_UPDATE", "recipe_id": recipe_id, "comments_count": total_comments}
+            await manager.broadcast_to_recipe(str(recipe_id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
 
         # 4. Trả về kết quả
         return success_response(
@@ -255,5 +273,213 @@ def rate_recipe(
         raise CustomException(
             message="Lỗi hệ thống khi gửi đánh giá",
             code="RATE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API YÊU THÍCH CÔNG THỨC (POST /api/recipes/{id}/favorite)
+@router.post("/recipes/{id}/favorite")
+def favorite_recipe(
+    id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        recipe = db.query(RecipeDB).filter(RecipeDB.id == id).first()
+        if not recipe:
+            raise CustomException(
+                message="Không tìm thấy công thức",
+                code="RECIPE_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        existing_favorite = db.query(FavoriteDB).filter(
+            FavoriteDB.recipe_id == id,
+            FavoriteDB.user_id == current_user.id
+        ).first()
+
+        if existing_favorite:
+            return success_response(
+                message="Bạn đã yêu thích công thức này rồi!",
+                data={"isFavorited": True}
+            )
+
+        new_favorite = FavoriteDB(recipe_id=id, user_id=current_user.id)
+        db.add(new_favorite)
+        db.commit()
+
+        total = db.query(FavoriteDB).filter(FavoriteDB.recipe_id == id).count()
+        async def broadcast():
+            payload = {"type": "TYM_UPDATE", "recipe_id": id, "favorites_count": total}
+            await manager.broadcast_to_recipe(str(id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
+
+
+        return success_response(
+            message="Đã thêm vào yêu thích!",
+            data={"isFavorited": True}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi yêu thích công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi yêu thích công thức",
+            code="FAVORITE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API BỎ YÊU THÍCH CÔNG THỨC (DELETE /api/recipes/{id}/favorite)
+@router.delete("/recipes/{id}/favorite")
+def unfavorite_recipe(
+    id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        existing_favorite = db.query(FavoriteDB).filter(
+            FavoriteDB.recipe_id == id,
+            FavoriteDB.user_id == current_user.id
+        ).first()
+
+        if not existing_favorite:
+            raise CustomException(
+                message="Bạn chưa yêu thích công thức này",
+                code="NOT_FAVORITED_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        db.delete(existing_favorite)
+        db.commit()
+
+        total = db.query(FavoriteDB).filter(FavoriteDB.recipe_id == id).count()
+        async def broadcast():
+            payload = {"type": "TYM_UPDATE", "recipe_id": id, "favorites_count": total}
+            await manager.broadcast_to_recipe(str(id), payload)
+            await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
+        background_tasks.add_task(broadcast)
+
+        return success_response(
+            message="Đã bỏ yêu thích!",
+            data={"isFavorited": False}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi bỏ yêu thích công thức: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi bỏ yêu thích",
+            code="UNFAVORITE_RECIPE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API THEO DÕI NGƯỜI DÙNG (POST /api/users/{id}/follow)
+@router.post("/users/{id}/follow")
+def follow_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Không được tự theo dõi chính mình
+        if current_user.id == id:
+            raise CustomException(
+                message="Bạn không thể tự theo dõi chính mình",
+                code="SELF_FOLLOW_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Kiểm tra người dùng được theo dõi có tồn tại không
+        target_user = db.query(UserDB).filter(UserDB.id == id).first()
+        if not target_user:
+            raise CustomException(
+                message="Không tìm thấy người dùng",
+                code="USER_NOT_FOUND",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+            
+        # Kiểm tra xem đã theo dõi chưa
+        existing_follow = db.query(FollowDB).filter(
+            FollowDB.follower_id == current_user.id,
+            FollowDB.following_id == id
+        ).first()
+        
+        if existing_follow:
+            return success_response(
+                message="Bạn đã theo dõi người dùng này rồi!",
+                data={"isFollowing": True}
+            )
+            
+        # Thêm bản ghi mới
+        new_follow = FollowDB(
+            follower_id=current_user.id,
+            following_id=id
+        )
+        db.add(new_follow)
+        target_user.follower_count = (target_user.follower_count or 0) + 1
+        db.commit()
+        
+        return success_response(
+            message="Theo dõi người dùng thành công!",
+            data={"isFollowing": True}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi theo dõi người dùng: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi theo dõi người dùng",
+            code="FOLLOW_USER_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# API HỦY THEO DÕI NGƯỜI DÙNG (DELETE /api/users/{id}/follow)
+@router.delete("/users/{id}/follow")
+def unfollow_user(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    try:
+        # Kiểm tra bản ghi theo dõi
+        existing_follow = db.query(FollowDB).filter(
+            FollowDB.follower_id == current_user.id,
+            FollowDB.following_id == id
+        ).first()
+        
+        if not existing_follow:
+            raise CustomException(
+                message="Bạn chưa theo dõi người dùng này",
+                code="NOT_FOLLOWING_ERROR",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        db.delete(existing_follow)
+        target_user = db.query(UserDB).filter(UserDB.id == id).first()
+        if target_user and target_user.follower_count > 0:
+            target_user.follower_count -= 1
+        db.commit()
+        
+        return success_response(
+            message="Đã hủy theo dõi người dùng!",
+            data={"isFollowing": False}
+        )
+    except CustomException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Lỗi hệ thống khi hủy theo dõi người dùng: {e}")
+        raise CustomException(
+            message="Lỗi hệ thống khi hủy theo dõi",
+            code="UNFOLLOW_USER_ERROR",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator, Alert, Button, StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, SafeAreaView, Image
 } from 'react-native';
-import { saveRecipeToDatabase, requestNewRecipe, AIAnalysisResult } from '../../services/aiService';
+import { requestNewRecipe, AIAnalysisResult } from '../../services/ai/aiService';
+import { saveRecipeToDatabase } from '../../services/recipe/recipeService';
 
 
 interface AnalysisResultProps {

@@ -30,3 +30,7 @@ class CommentCreate(BaseModel):
 
 class RatingCreate(BaseModel):
     score: int = Field(..., ge=1, le=5, description="Điểm đánh giá từ 1 đến 5 sao")
+
+class RateRecipeRequest(BaseModel):
+    score: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
