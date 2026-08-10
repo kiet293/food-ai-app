@@ -39,6 +39,9 @@ class RecipeDB(Base):
 
     # Cột lưu điểm xu hướng (Trending Score)
     trending_score = Column(Float, default=0.0, index=True)
+    
+    # Đánh dấu công thức do AI sinh ra
+    is_ai = Column(Boolean, default=False, index=True)
 
     # Tự động lưu thời gian tạo và cập nhật
     created_at = Column(DateTime(timezone=True), server_default=func.now())

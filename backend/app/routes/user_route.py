@@ -110,8 +110,10 @@ def get_user_profile(
         })
 
     # Get recent recipes authored by this user
-    recent_recipes = db.query(RecipeDB).filter(RecipeDB.user_id == user_id).order_by(RecipeDB.created_at.desc()).limit(10).all()
-    
+    recent_recipes = db.query(RecipeDB).filter(
+        RecipeDB.user_id == user_id,
+        RecipeDB.is_ai == False
+    ).order_by(RecipeDB.created_at.desc()).limit(10).all()
     # Get user's collections
     collections = db.query(CollectionDB).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.created_at.desc()).all()
     

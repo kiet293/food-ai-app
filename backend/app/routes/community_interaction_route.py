@@ -316,6 +316,7 @@ def favorite_recipe(
             await manager.broadcast_to_recipe("GLOBAL_FEED", payload)
         background_tasks.add_task(broadcast)
 
+
         return success_response(
             message="Đã thêm vào yêu thích!",
             data={"isFavorited": True}

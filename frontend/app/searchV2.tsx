@@ -18,7 +18,7 @@ import {
   Keyboard,
 } from 'react-native';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { searchRecipes, AIAnalysisResult } from "../services/ai/aiService";
 import { saveRecipeToDatabase } from "../services/recipe/recipeService";
 
@@ -32,7 +32,7 @@ export default function SearchPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<AIAnalysisResult | null>(null);
 
-  // Tß╗▒ ─æß╗Öng t├¼m kiß║┐m nß║┐u c├│ param q truyß╗ün sang
+  // Tự động tìm kiếm nếu có param q truyền sang
   useEffect(() => {
     if (q) {
       setSearchText(q);
@@ -44,12 +44,12 @@ export default function SearchPage() {
     const query = (queryToSearch ?? searchText).trim();
     if (!query) return;
 
-    // Tß║»t b├án ph├¡m
+    // Tắt bàn phím
     Keyboard.dismiss();
 
     setIsLoading(true);
     try {
-      // T├ích nguy├¬n liß╗çu bß╗ƒi dß║Ñu phß║⌐y hoß║╖c khoß║úng trß║»ng
+      // Tách nguyên liệu bởi dấu phẩy hoặc khoảng trắng
       const ingredients = query
         .split(",")
         .map((s) => s.trim())
@@ -58,11 +58,11 @@ export default function SearchPage() {
       const response = await searchRecipes(ingredients);
       setRecipes(response?.recipes || []);
       if (!response?.recipes || response.recipes.length === 0) {
-        Alert.alert("Th├┤ng b├ío", "Kh├┤ng t├¼m thß║Ñy m├│n ─ân n├áo ph├╣ hß╗úp. Bß║ín h├úy thß╗¡ thay ─æß╗òi danh s├ích nguy├¬n liß╗çu xem nh├⌐!");
+        Alert.alert("Thông báo", "Không tìm thấy món ăn nào phù hợp. Bạn hãy thử thay đổi danh sách nguyên liệu xem nhé!");
       }
     } catch (error) {
-      console.error("Lß╗ùi t├¼m kiß║┐m:", error);
-      Alert.alert("Lß╗ùi", "─É├ú xß║úy ra lß╗ùi kß║┐t nß╗æi. Vui l├▓ng thß╗¡ lß║íi sau!");
+      console.error("Lỗi tìm kiếm:", error);
+      Alert.alert("Lỗi", "Đã xảy ra lỗi kết nối. Vui lòng thử lại sau!");
     } finally {
       setIsLoading(false);
     }
@@ -72,9 +72,9 @@ export default function SearchPage() {
     setIsSaving(true);
     try {
       await saveRecipeToDatabase(recipe);
-      Alert.alert("Th├ánh c├┤ng! ≡ƒÄë", `─É├ú th├¬m "${recipe.recipeName}" v├áo Sß╗ò tay cß╗ºa bß║ín.`);
+      Alert.alert("Thành công! 🎉", `Đã thêm "${recipe.recipeName}" vào Sổ tay của bạn.`);
     } catch (error: any) {
-      Alert.alert("Th├┤ng b├ío", error.message || "Kh├┤ng thß╗â l╞░u l├║c n├áy. Vui l├▓ng thß╗¡ lß║íi sau.");
+      Alert.alert("Thông báo", error.message || "Không thể lưu lúc này. Vui lòng thử lại sau.");
     } finally {
       setIsSaving(false);
     }
@@ -96,10 +96,10 @@ export default function SearchPage() {
           {item.recipeName}
         </Text>
         <Text style={styles.recipeSnippet} numberOfLines={2}>
-          {item.instructions && item.instructions[0] ? item.instructions[0] : "Ch╞░a c├│ h╞░ß╗¢ng dß║½n nß║Ñu cß╗Ñ thß╗â."}
+          {item.instructions && item.instructions[0] ? item.instructions[0] : "Chưa có hướng dẫn nấu cụ thể."}
         </Text>
         <Text style={styles.ingredientsSummary} numberOfLines={1}>
-          ≡ƒ¢Æ {item.ingredients.map((ing) => ing.name).join(" ┬╖ ")}
+          🛒 {item.ingredients.map((ing) => ing.name).join(" · ")}
         </Text>
       </View>
       <View style={styles.arrowIconContainer}>
@@ -110,6 +110,7 @@ export default function SearchPage() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="dark-content" backgroundColor="#f6f3ea" />
 
       {/* Header */}
@@ -117,7 +118,7 @@ export default function SearchPage() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <MaterialIcons name="arrow-back" size={24} color="#111" />
         </Pressable>
-        <Text style={styles.title}>T├¼m Kiß║┐m Gß╗úi ├¥ M├│n ─én</Text>
+        <Text style={styles.title}>Tìm Kiếm Gợi Ý Món Ăn</Text>
       </View>
 
       {/* Search Input Box */}
@@ -125,7 +126,7 @@ export default function SearchPage() {
         <View style={styles.searchBox}>
           <MaterialIcons name="search" size={24} color="#626262" style={styles.searchIcon} />
           <TextInput
-            placeholder="V├¡ dß╗Ñ: thß╗ït heo, c├á chua, h├ánh t├óy..."
+            placeholder="Ví dụ: thịt heo, cà chua, hành tây..."
             placeholderTextColor="#8d8d8d"
             style={styles.searchInput}
             value={searchText}
@@ -144,7 +145,7 @@ export default function SearchPage() {
           onPress={() => performSearch()}
           activeOpacity={0.8}
         >
-          <Text style={styles.searchButtonText}>T├¼m</Text>
+          <Text style={styles.searchButtonText}>Tìm</Text>
         </TouchableOpacity>
       </View>
 
@@ -153,7 +154,7 @@ export default function SearchPage() {
         {isLoading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#2ecc71" />
-            <Text style={styles.loadingText}>Gemini ─æang vß║»t ├│c suy ngh─⌐ m├│n ─ân...</Text>
+            <Text style={styles.loadingText}>Gemini đang vắt óc suy nghĩ món ăn...</Text>
           </View>
         ) : recipes.length > 0 ? (
           <FlatList
@@ -165,15 +166,15 @@ export default function SearchPage() {
           />
         ) : (
           <View style={styles.centerContainer}>
-            <Text style={styles.emptyEmoji}>≡ƒÑ¼≡ƒì│≡ƒÑò</Text>
+            <Text style={styles.emptyEmoji}>🥬🍲🥕</Text>
             <Text style={styles.emptyText}>
-              Nhß║¡p c├íc nguy├¬n liß╗çu bß║ín c├│ v├áo ├┤ t├¼m kiß║┐m ß╗ƒ tr├¬n ─æß╗â AI gß╗úi ├╜ c├íc c├┤ng thß╗⌐c nß║Ñu ─ân ph├╣ hß╗úp nh├⌐!
+              Nhập các nguyên liệu bạn có vào ô tìm kiếm ở trên để AI gợi ý các công thức nấu ăn phù hợp nhé!
             </Text>
           </View>
         )}
       </View>
 
-      {/* Modal chi tiß║┐t c├┤ng thß╗⌐c */}
+      {/* Modal chi tiết công thức */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -203,7 +204,7 @@ export default function SearchPage() {
                   )}
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>≡ƒ¢Æ Nguy├¬n liß╗çu cß║ºn thiß║┐t</Text>
+                    <Text style={styles.sectionTitle}>🛒 Nguyên liệu cần thiết</Text>
                     {selectedRecipe.ingredients.map((item, index) => (
                       <View key={index} style={styles.ingredientRow}>
                         <View style={styles.ingredientDot} />
@@ -213,7 +214,7 @@ export default function SearchPage() {
                   </View>
 
                   <View style={styles.sectionBox}>
-                    <Text style={styles.sectionTitle}>≡ƒì│ H╞░ß╗¢ng dß║½n thß╗▒c hiß╗çn</Text>
+                    <Text style={styles.sectionTitle}>🍳 Hướng dẫn thực hiện</Text>
                     {selectedRecipe.instructions.map((step, index) => (
                       <View key={index} style={styles.stepRow}>
                         <View style={styles.stepNumber}>
@@ -226,7 +227,7 @@ export default function SearchPage() {
                   <View style={{ height: 20 }} />
                 </ScrollView>
 
-                {/* N├║t h├ánh ─æß╗Öng */}
+                {/* Nút hành động */}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.saveButton]}
@@ -237,7 +238,7 @@ export default function SearchPage() {
                     {isSaving ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={styles.saveButtonText}>Γ¥ñ∩╕Å L╞░u v├áo sß╗ò tay cß╗ºa t├┤i</Text>
+                      <Text style={styles.saveButtonText}>❤️ Lưu vào sổ tay của tôi</Text>
                     )}
                   </TouchableOpacity>
 
@@ -246,7 +247,7 @@ export default function SearchPage() {
                     onPress={() => setSelectedRecipe(null)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.closeButtonText}>─É├│ng</Text>
+                    <Text style={styles.closeButtonText}>Đóng</Text>
                   </TouchableOpacity>
                 </View>
               </>

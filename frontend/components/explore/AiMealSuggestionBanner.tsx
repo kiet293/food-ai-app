@@ -9,7 +9,7 @@ export const AiMealSuggestionBanner: React.FC = () => {
   return (
     <TouchableOpacity
       style={styles.bannerContainer}
-      onPress={() => router.push('/search?q=gợi ý bữa ăn ngon hôm nay')}
+      onPress={() => router.push('/searchV2?q=gợi ý bữa ăn ngon hôm nay')}
       activeOpacity={0.9}
     >
       <Image

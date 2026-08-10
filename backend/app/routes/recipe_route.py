@@ -126,7 +126,9 @@ def get_trending_recipes(
 ):
     """Lấy danh sách các món ăn đang hot dựa trên trending_score"""
     try:
-        recipes = db.query(RecipeDB).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
+        recipes = db.query(RecipeDB).filter(
+            RecipeDB.is_ai == False
+        ).order_by(RecipeDB.trending_score.desc().nullslast()).limit(limit).all()
         
         results = []
         for index, recipe in enumerate(recipes):
@@ -172,13 +174,31 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
             recipe_name=recipe_data.recipeName,
             ingredients=ingredients_list,
             instructions=recipe_data.instructions,
-            image_url=recipe_data.imageUrl
+            image_url=recipe_data.imageUrl,
+            is_ai=True
         )
 
         # Lưu vào Database
         db.add(new_recipe)
         db.commit()
         db.refresh(new_recipe) # Lấy ID vừa được tạo ra
+
+        # Tự động tạo và thêm vào bộ sưu tập "AI gợi ý"
+        from app.models.collection_model import CollectionDB, CollectionRecipeDB
+        ai_collection = db.query(CollectionDB).filter(
+            CollectionDB.user_id == current_user.id,
+            CollectionDB.name == "AI gợi ý"
+        ).first()
+
+        if not ai_collection:
+            ai_collection = CollectionDB(user_id=current_user.id, name="AI gợi ý")
+            db.add(ai_collection)
+            db.commit()
+            db.refresh(ai_collection)
+        
+        collection_recipe = CollectionRecipeDB(collection_id=ai_collection.id, recipe_id=new_recipe.id)
+        db.add(collection_recipe)
+        db.commit()
 
         # Ghi nhận lượt lưu (Thích) vào bảng thống kê phổ biến
         record_recipe_save(
@@ -189,7 +209,7 @@ def save_recipe(recipe_data: AIAnalysisResult, db: Session = Depends(get_db), cu
             image_url=recipe_data.imageUrl
         )
 
-        print(f"💾 Đã lưu thành công món: {new_recipe.recipe_name}")
+        print(f"💾 Đã lưu thành công món: {new_recipe.recipe_name} vào bộ sưu tập AI gợi ý")
         return {"message": "Lưu công thức thành công!", "recipe_id": new_recipe.id}
 
     except Exception as e:
@@ -404,7 +424,7 @@ def get_explore_grid(
 ):
     try:
         # Sắp xếp mới nhất lên đầu (dựa vào ID giảm dần cho nhanh và chính xác)
-        query = db.query(RecipeDB)
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
         
         if tag and tag != "Tất Cả":
             tag_slug = slugify(tag)
@@ -458,7 +478,7 @@ def get_explore_feed(
     current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
     try:
-        query = db.query(RecipeDB)
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
         
         if tag:
             tag_slug = slugify(tag.replace('#', '')) # Remove # if present
@@ -509,7 +529,8 @@ def get_following_feed(
             FollowDB, 
             RecipeDB.user_id == FollowDB.following_id
         ).filter(
-            FollowDB.follower_id == current_user.id
+            FollowDB.follower_id == current_user.id,
+            RecipeDB.is_ai == False
         )
         
         if tag:
@@ -637,7 +658,7 @@ def get_recipes(
         if sort_by not in ["newest", "popular", "top_rated"]:
             sort_by = "newest"
 
-        query = db.query(RecipeDB)
+        query = db.query(RecipeDB).filter(RecipeDB.is_ai == False)
 
         # Xử lý sort
         if sort_by == "newest":

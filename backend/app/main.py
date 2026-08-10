@@ -41,6 +41,7 @@ app.include_router(reel_route.router, prefix="/api/reels", tags=["Reels Manageme
 app.include_router(tag_route.router, prefix="/api/tags", tags=["Tag Management"])
 app.include_router(user_route.router, prefix="/api/users", tags=["User Management"])
 app.include_router(collection_route.router, prefix="/api/collections", tags=["Collection Management"])
+
 app.include_router(ws_route.router, tags=["WebSockets"])
 
 # Khai báo cấu hình Cloudinary trong quá trình khởi động ứng dụng

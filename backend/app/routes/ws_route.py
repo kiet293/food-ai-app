@@ -22,3 +22,13 @@ async def feed_websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, "GLOBAL_FEED")
+
+@router.websocket("/ws/notifications/{user_id}")
+async def notifications_websocket_endpoint(websocket: WebSocket, user_id: int):
+    room_id = f"USER_NOTIFY_{user_id}"
+    await manager.connect(websocket, room_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, room_id)
