@@ -30,8 +30,8 @@ interface RecipeFeedListProps {
   onTagChange?: (tag: string | null) => void;
 }
 
-export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({ 
-  fetchData, 
+export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
+  fetchData,
   initialStartId = null,
   ListHeaderComponent,
   onTagChange
@@ -159,7 +159,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
     setIsLoading(true);
 
     let startId = isLoadMore ? cursor : initialStartId;
-    
+
     if (tagFilter && !isLoadMore) {
       startId = null;
     }
@@ -221,14 +221,14 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 
   const renderDescriptionWithTags = (text: string) => {
     if (!text) return null;
-    
+
     const words = text.split(/(\s+)/);
     return words.map((word, index) => {
       if (word.startsWith('#')) {
         const cleanWord = word.trim();
         return (
-          <Text 
-            key={index} 
+          <Text
+            key={index}
             style={styles.hashtag}
             onPress={() => setTagFilter(cleanWord)}
           >
@@ -245,7 +245,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
       <View style={styles.cardContainer}>
         {/* AUTHOR HEADER */}
         <View style={styles.authorHeader}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.authorInfoLeft}
             activeOpacity={0.7}
             onPress={() => router.push(`/user/${item.author?.id}` as any)}
@@ -264,15 +264,15 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
           </TouchableOpacity>
 
           {!item.author?.is_self && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.followButton, 
+                styles.followButton,
                 item.author?.is_following && styles.followingButton
               ]}
               onPress={() => handleToggleFollow(item)}
             >
               <Text style={[
-                styles.followButtonText, 
+                styles.followButtonText,
                 item.author?.is_following && styles.followingButtonText
               ]}>
                 {item.author?.is_following ? 'Đang follow' : 'Follow'}
@@ -282,7 +282,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
         </View>
 
         {/* MAIN RECIPE CARD (IMAGE) */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.imageCard}
           activeOpacity={0.95}
           onPress={() => router.push(`/recipe/${item.id}` as any)}
@@ -294,7 +294,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 
         {/* DETAILS SECTION */}
         <View style={styles.detailsSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push(`/recipe/${item.id}` as any)}
           >
@@ -351,8 +351,8 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
             </TouchableOpacity>
 
             {/* SHARE */}
-            <TouchableOpacity 
-              style={styles.actionBtn} 
+            <TouchableOpacity
+              style={styles.actionBtn}
               activeOpacity={0.7}
               onPress={() => {
                 setActivePostForModal(item);
@@ -369,10 +369,10 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
             activeOpacity={0.7}
             onPress={() => setSelectedRecipeForCollection(item.id)}
           >
-            <Ionicons 
-              name={item.is_in_collection ? "bookmark" : "bookmark-outline"} 
-              size={24} 
-              color={item.is_in_collection ? "#fe2c55" : "#1e293b"} 
+            <Ionicons
+              name={item.is_in_collection ? "bookmark" : "bookmark-outline"}
+              size={24}
+              color={item.is_in_collection ? "#fe2c55" : "#1e293b"}
             />
           </TouchableOpacity>
         </View>
