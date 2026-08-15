@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiBaseUrl } from '../shared/apiConfig';
-import { getToken } from '../auth/authService';
+import { apiClient } from '../shared/apiClient';
 import { AuthorInfo } from '../shared/types';
 import { CommentInfo } from '../community/communityService';
 import { AIAnalysisResult } from '../ai/aiService';
@@ -28,10 +29,11 @@ export interface TrendingRecipeItem {
   ratings_count?: number;
 }
 
+const API_BASE_URL = getApiBaseUrl();
+
 export const fetchCategories = async (): Promise<CategoryItem[]> => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/recipes/categories`);
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/recipes/categories`);
     if (data.status === 'success') {
       return data.data;
     }
@@ -44,20 +46,8 @@ export const fetchCategories = async (): Promise<CategoryItem[]> => {
 
 export const fetchTrendingRecipes = async (limit: number = 10): Promise<TrendingRecipeItem[]> => {
   try {
-    const API_BASE_URL = getApiBaseUrl();
-    const token = await getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/recipes/trending?limit=${limit}`, {
-      method: 'GET',
-      headers,
-    });
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/recipes/trending?limit=${limit}`);
     if (data.status === 'success') {
-      // Map về cấu trúc của TrendingRecipeItem để UI dễ hiển thị
       return data.data.map((item: any) => ({
         id: item.id.toString(),
         title: item.title,
@@ -78,15 +68,7 @@ export const fetchTrendingRecipes = async (limit: number = 10): Promise<Trending
 
 export const createRecipe = async (formData: FormData): Promise<boolean> => {
   try {
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/recipes/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData,
-    });
-    const data = await response.json();
+    const data = await apiClient.post(`${API_BASE_URL}/recipes/`, formData);
     return data.status === 'success';
   } catch (error) {
     console.error('Error creating recipe:', error);
@@ -96,15 +78,7 @@ export const createRecipe = async (formData: FormData): Promise<boolean> => {
 
 export const updateRecipe = async (id: string, formData: FormData): Promise<boolean> => {
   try {
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/recipes/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData,
-    });
-    const data = await response.json();
+    const data = await apiClient.put(`${API_BASE_URL}/recipes/${id}`, formData);
     return data.status === 'success';
   } catch (error) {
     console.error('Error updating recipe:', error);
@@ -129,20 +103,7 @@ export const fetchExploreGrid = async (cursor: number | null = null, limit: numb
       queryParams.append('tag', tag);
     }
 
-    const API_BASE_URL = getApiBaseUrl();
-
-    const response = await fetch(`${API_BASE_URL}/recipes/explore-grid?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server explore-grid đang lỗi');
-    }
-
-    const json = await response.json();
+    const json = await apiClient.get(`${API_BASE_URL}/recipes/explore-grid?${queryParams.toString()}`);
     return json.data || { items: [], next_cursor: null };
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách explore-grid:", error);
@@ -185,23 +146,7 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
       queryParams.append('tag', tag);
     }
 
-    const API_RECIPES = `${getApiBaseUrl()}/recipes`;
-    const token = await getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_RECIPES}/explore-feed?${queryParams.toString()}`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error('Server explore-feed đang lỗi');
-    }
-
-    const json = await response.json();
+    const json = await apiClient.get(`${API_BASE_URL}/recipes/explore-feed?${queryParams.toString()}`);
     return json.data || { items: [], next_cursor: null };
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách explore-feed:", error);
@@ -211,6 +156,11 @@ export const fetchExploreFeed = async (startId: number | null = null, limit: num
 
 export const fetchFollowingFeed = async (startId: number | null = null, limit: number = 5, tag: string | null = null): Promise<ExploreFeedResponse> => {
   try {
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      return { items: [], next_cursor: null };
+    }
+
     const queryParams = new URLSearchParams({
       limit: limit.toString()
     });
@@ -221,27 +171,7 @@ export const fetchFollowingFeed = async (startId: number | null = null, limit: n
       queryParams.append('tag', tag);
     }
 
-    const API_RECIPES = `${getApiBaseUrl()}/recipes`;
-    const token = await getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else {
-      // Following feed requires authentication
-      return { items: [], next_cursor: null };
-    }
-
-    const response = await fetch(`${API_RECIPES}/following-feed?${queryParams.toString()}`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Server following-feed đang lỗi: ${errText}`);
-    }
-
-    const json = await response.json();
+    const json = await apiClient.get(`${API_BASE_URL}/recipes/following-feed?${queryParams.toString()}`);
     return json.data || { items: [], next_cursor: null };
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách following-feed:", error);
@@ -260,25 +190,7 @@ export interface RecipeDetails extends ExploreFeedItem {
 
 export const fetchRecipeDetails = async (id: number): Promise<RecipeDetails | null> => {
   try {
-    const API_BASE_URL = getApiBaseUrl();
-    const token = await getToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể tải chi tiết công thức');
-    }
-
-    const json = await response.json();
+    const json = await apiClient.get(`${API_BASE_URL}/recipes/${id}`);
     return json.data || null;
   } catch (error) {
     console.error("❌ Lỗi lấy chi tiết công thức:", error);
@@ -302,25 +214,9 @@ export interface PopularRecipe {
 export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promise<boolean> => {
   try {
     console.log("💾 Đang gửi yêu cầu lưu công thức...");
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/recipes/save`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(recipeData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Server từ chối lưu dữ liệu');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.post(`${API_BASE_URL}/recipes/save`, recipeData);
     console.log("✅ Server phản hồi:", result.message);
     return true;
-
   } catch (error: any) {
     console.error("❌ Lỗi khi lưu công thức:", error.message);
     throw error;
@@ -331,18 +227,7 @@ export const saveRecipeToDatabase = async (recipeData: AIAnalysisResult): Promis
 export const getSavedRecipes = async () => {
   try {
     console.log("📖 Đang tải Sổ tay nấu ăn...");
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/recipes/list`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server từ chối cung cấp dữ liệu');
-    }
-
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/recipes/list`);
     return data.map((item: any) => ({
       id: item.id.toString(),
       recipeName: item.recipe_name,
@@ -355,27 +240,15 @@ export const getSavedRecipes = async () => {
     console.error("❌ Lỗi khi tải Sổ tay:", error);
     return [];
   }
-}
+};
 
 // Hàm XÓA công thức khỏi Database
 export const deleteRecipe = async (id: string): Promise<boolean> => {
   try {
     console.log("🗑️ Đang yêu cầu Server xóa công thức ID:", id);
-    const token = await getToken();
-    const response = await fetch(`${getApiBaseUrl()}/recipes/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server từ chối xóa dữ liệu');
-    }
-
+    await apiClient.delete(`${API_BASE_URL}/recipes/${id}`);
     console.log("✅ Server đã xác nhận xóa thành công!");
     return true;
-
   } catch (error) {
     console.error("❌ Lỗi khi xóa công thức:", error);
     return false;
@@ -386,13 +259,7 @@ export const deleteRecipe = async (id: string): Promise<boolean> => {
 export const getPopularRecipes = async (): Promise<PopularRecipe[]> => {
   try {
     console.log("🔥 Đang tải danh sách món ăn phổ biến...");
-    const response = await fetch(`${getApiBaseUrl()}/recipes/popular`);
-
-    if (!response.ok) {
-      throw new Error('Server từ chối cung cấp dữ liệu xu hướng');
-    }
-
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/recipes/popular`);
     return data.map((item: any) => ({
       id: item.id.toString(),
       recipeName: item.recipe_name,

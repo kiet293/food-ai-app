@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../shared/apiConfig';
+import { apiClient } from '../shared/apiClient';
 
 export interface TagInfo {
   id: number;
@@ -10,18 +11,7 @@ export interface TagInfo {
 export const fetchHotTags = async (): Promise<TagInfo[]> => {
   try {
     const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/tags/hot`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server tags/hot đang lỗi');
-    }
-
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/tags/hot`);
     return data || [];
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách hot tags:", error);

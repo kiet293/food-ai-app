@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../shared/apiConfig';
+import { apiClient } from '../shared/apiClient';
 
 export interface RecipeSummary {
   id: number;
@@ -23,22 +24,9 @@ export const searchCommunityRecipes = async (keyword: string, page: number = 1, 
       limit: limit.toString()
     });
 
-    // Gọi API của search_route.py (Lưu ý: API này đang nằm trong nhóm /api/search)
+    // Gọi API của search_route.py
     const API_SEARCH = `${getApiBaseUrl()}/search`;
-
-    const response = await fetch(`${API_SEARCH}/recipes?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server community search đang lỗi');
-    }
-
-    const json = await response.json();
-    // Server trả về: { status: "success", data: { items: [...], pagination: {...} } }
+    const json = await apiClient.get(`${API_SEARCH}/recipes?${queryParams.toString()}`);
     return json.data || { items: [], pagination: {} };
   } catch (error) {
     console.error("❌ Lỗi tìm kiếm công thức cộng đồng:", error);

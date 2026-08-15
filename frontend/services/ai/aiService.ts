@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../shared/apiConfig';
+import { apiClient } from '../shared/apiClient';
 
 // cấu trúc dữ liệu cho phân tích món ăn
 export interface AIAnalysisResult {
@@ -30,22 +31,8 @@ export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalys
       } as any);
     });
 
-    // 3. Gọi anh shipper chở hàng đi
     console.log("🚀 Đang gửi", imageUris.length, "bức ảnh lên Server...");
-    const response = await fetch(`${API_AI}/analyze`, {
-      method: 'POST',
-      body: formData,
-      // React Native sẽ tự động tạo Content-Type kèm boundary (dấu phân cách file)
-    });
-
-    if (!response.ok) {
-      throw new Error('Server AI đang từ chối kết nối');
-    }
-
-    // 4. Mở kiện hàng Server gửi về (JSON)
-    const data = await response.json();
-    return data;
-
+    return await apiClient.post(`${API_AI}/analyze`, formData);
   } catch (error) {
     console.error("❌ Lỗi kết nối Server:", error);
     return {
@@ -67,25 +54,11 @@ export const requestNewRecipe = async (
 ): Promise<AIAnalysisResult | null> => {
   try {
     console.log(`💬 Đang yêu cầu AI đổi món: "${userMessage}"...`);
-    const response = await fetch(`${API_AI}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ingredients: ingredients,
-        current_recipe: currentRecipe,
-        user_message: userMessage
-      }),
+    return await apiClient.post(`${API_AI}/chat`, {
+      ingredients: ingredients,
+      current_recipe: currentRecipe,
+      user_message: userMessage
     });
-
-    if (!response.ok) {
-      throw new Error('Server AI chat đang lỗi');
-    }
-
-    const data = await response.json();
-    return data;
-
   } catch (error) {
     console.error("❌ Lỗi Chat AI:", error);
     return null;
@@ -96,20 +69,7 @@ export const requestNewRecipe = async (
 export const searchRecipes = async (ingredients: string[]): Promise<{ recipes: AIAnalysisResult[] }> => {
   try {
     console.log("🔎 Đang gửi danh sách nguyên liệu để tìm kiếm món ăn...");
-    const response = await fetch(`${API_AI}/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ingredients }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Server AI search đang lỗi');
-    }
-
-    const data = await response.json();
-    return data;
+    return await apiClient.post(`${API_AI}/search`, { ingredients });
   } catch (error) {
     console.error("❌ Lỗi tìm kiếm công thức:", error);
     return { recipes: [] };
