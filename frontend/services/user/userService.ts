@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../shared/apiConfig';
-import { getToken } from '../auth/authService';
+import { apiClient } from '../shared/apiClient';
 
 export interface UserProfileInfo {
   id: string;
@@ -32,24 +32,7 @@ export interface UserProfileInfo {
 export const fetchUserProfile = async (userId: string): Promise<UserProfileInfo | null> => {
   try {
     const API_BASE_URL = getApiBaseUrl();
-    const token = await getToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error('Không thể tải thông tin profile');
-    }
-
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/users/${userId}/profile`);
     return data.data;
   } catch (error) {
     console.error("❌ Lỗi lấy thông tin profile:", error);
@@ -68,18 +51,7 @@ export interface ChefInfo {
 export const fetchPopularChefs = async (): Promise<ChefInfo[]> => {
   try {
     const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/users/popular-chefs`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Server popular-chefs đang lỗi');
-    }
-
-    const data = await response.json();
+    const data = await apiClient.get(`${API_BASE_URL}/users/popular-chefs`);
     return data.data || [];
   } catch (error) {
     console.error("❌ Lỗi lấy danh sách popular chefs:", error);

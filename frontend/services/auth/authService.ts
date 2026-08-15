@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiBaseUrl } from '../shared/apiConfig';
+import { apiClient } from '../shared/apiClient';
 
 const AUTH_URL = `${getApiBaseUrl()}/auth`;
 
@@ -13,34 +14,19 @@ export const authenticateUser = async (username: string, password: string, isLog
         let headers: any = {};
 
         if (isLogin) {
-            // API Login của FastAPI yêu cầu định dạng FormData (application/x-www-form-urlencoded)
             bodyData = `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
             headers['Content-Type'] = 'application/x-www-form-urlencoded';
         } else {
-            // API Register yêu cầu JSON
-            bodyData = JSON.stringify({ username, password });
-            headers['Content-Type'] = 'application/json';
+            bodyData = { username, password };
         }
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: bodyData,
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Lỗi xác thực');
-        }
-
-        const data = await response.json();
+        const data = await apiClient.post(url, bodyData, { headers });
 
         // Chỉ lưu Token vào ví nếu là Đăng nhập
         if (isLogin) {
             await AsyncStorage.setItem('userToken', data.access_token);
         }
         return true;
-
     } catch (error: any) {
         console.error(`❌ Lỗi ${isLogin ? 'Đăng nhập' : 'Đăng ký'}:`, error.message);
         throw error;
@@ -60,19 +46,7 @@ export const logoutUser = async () => {
 // HÀM LẤY THÔNG TIN CÁ NHÂN
 export const getUserProfile = async () => {
     try {
-        const token = await getToken();
-        if (!token) throw new Error("Chưa đăng nhập");
-
-        const response = await fetch(`${AUTH_URL}/me`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) throw new Error("Không thể tải thông tin");
-
-        return await response.json();
+        return await apiClient.get(`${AUTH_URL}/me`);
     } catch (error) {
         console.error("❌ Lỗi tải Profile:", error);
         return null;
@@ -82,38 +56,21 @@ export const getUserProfile = async () => {
 // HÀM CẬP NHẬT THÔNG TIN CÁ NHÂN (Tên, Avatar, Bio)
 export const updateUserProfile = async (fullName?: string, avatar?: string, bio?: string) => {
     try {
-        const token = await getToken();
-        if (!token) throw new Error("Chưa đăng nhập");
-
         const bodyData: any = {};
         if (fullName !== undefined) bodyData.full_name = fullName;
         if (avatar !== undefined) bodyData.avatar = avatar;
         if (bio !== undefined) bodyData.bio = bio;
 
-        const response = await fetch(`${AUTH_URL}/me/update`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-        });
-
-        if (!response.ok) throw new Error("Không thể cập nhật thông tin");
-
-        return await response.json();
+        return await apiClient.put(`${AUTH_URL}/me/update`, bodyData);
     } catch (error) {
         console.error("❌ Cập nhật Profile:", error);
         return false;
     }
-}
+};
 
 // HÀM CẬP NHẬT ẢNH ĐẠI DIỆN BẰNG FILE
 export const updateUserAvatar = async (imageUri: string) => {
     try {
-        const token = await getToken();
-        if (!token) throw new Error("Chưa đăng nhập");
-
         const formData = new FormData();
         const filename = imageUri.split('/').pop() || 'avatar.jpg';
         const match = /\.(\w+)$/.exec(filename);
@@ -125,18 +82,7 @@ export const updateUserAvatar = async (imageUri: string) => {
             type,
         } as any);
 
-        const response = await fetch(`${AUTH_URL}/me/avatar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'multipart/form-data',
-            },
-            body: formData,
-        });
-
-        if (!response.ok) throw new Error("Không thể tải ảnh lên");
-
-        return await response.json();
+        return await apiClient.post(`${AUTH_URL}/me/avatar`, formData);
     } catch (error) {
         console.error("❌ Lỗi tải ảnh lên:", error);
         throw error;

@@ -134,15 +134,16 @@ export default function PlayScreen() {
     setIsMuted(!isMuted);
   };
 
-  // Callback to track active visible video
+  // Tự động phát video đang hiển thị
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems && viewableItems.length > 0) {
       setActiveReelId(viewableItems[0].key);
     }
   }).current;
 
+  // Cấu hình phát video
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 70, // Play when 70% of item is viewable
+    itemVisiblePercentThreshold: 70,
   }).current;
 
   return (

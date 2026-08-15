@@ -105,6 +105,7 @@ export default function ProfileScreen() {
       return;
     }
 
+    // Thay đổi avatar
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
