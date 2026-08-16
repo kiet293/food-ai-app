@@ -6,8 +6,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from datetime import datetime, timezone
 from app.utils.response import CustomException
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import database, recipe_model, reel_model, collection_model
-from app.routes import ai_route, recipe_route, auth_route, search_route, community_interaction_route, reel_route, tag_route, user_route, collection_route, ws_route
+from app.models import database
+from app.reels.models import models_reel as reel_model
+from app.users.models import models_user as user_model
+from app.recipes.models import models_recipe as recipe_model
+from app.collections.models import models_collection as collection_model
+from app.notifications.models import models_notification as notification_model
+from app.reels.routers import router as reel_router
+from app.users.routers import router_auth, router_user
+from app.recipes.routers import router as recipe_router, comment_router as recipe_comment_router
+from app.collections.routers import router as collection_router
+from app.ai.routers import router as ai_router
+from app.search.routers import router as search_router
+from app.notifications.routers import router as notification_router
 from app.tasks.trending_task import trending_scheduler_task
 import asyncio
 from dotenv import load_dotenv
@@ -32,17 +43,15 @@ app.add_middleware(
 )
 
 # Đăng ký nhóm API từ thư mục routes vào đường dẫn gốc /api
-app.include_router(auth_route.router, prefix="/api/auth", tags=["Authentication"]) # <--- Đăng ký API
-app.include_router(ai_route.router, prefix="/api", tags=["AI Analysis"])
-app.include_router(recipe_route.router, prefix="/api/recipes", tags=["Recipe Management"])
-app.include_router(community_interaction_route.router, prefix="/api")
-app.include_router(search_route.router, prefix="/api/search", tags=["Search API"])
-app.include_router(reel_route.router, prefix="/api/reels", tags=["Reels Management"])
-app.include_router(tag_route.router, prefix="/api/tags", tags=["Tag Management"])
-app.include_router(user_route.router, prefix="/api/users", tags=["User Management"])
-app.include_router(collection_route.router, prefix="/api/collections", tags=["Collection Management"])
-
-app.include_router(ws_route.router, tags=["WebSockets"])
+app.include_router(router_auth, prefix="/api/auth", tags=["Authentication"]) # <--- Đăng ký API
+app.include_router(ai_router, prefix="/api", tags=["AI Analysis"])
+app.include_router(recipe_router, prefix="/api/recipes", tags=["Recipe Management"])
+app.include_router(recipe_comment_router, prefix="/api")
+app.include_router(search_router, prefix="/api/search", tags=["Search API"])
+app.include_router(reel_router, prefix="/api/reels", tags=["Reels Management"])
+app.include_router(router_user, prefix="/api/users", tags=["User Management"])
+app.include_router(collection_router, prefix="/api/collections", tags=["Collection Management"])
+app.include_router(notification_router)
 
 # Khai báo cấu hình Cloudinary trong quá trình khởi động ứng dụng
 cloudinary.config(
@@ -84,13 +93,19 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        if "input" in err and isinstance(err["input"], bytes):
+            err = dict(err)
+            err["input"] = err["input"].decode("utf-8", errors="ignore")
+        errors.append(err)
     return JSONResponse(
         status_code=422,
         content={
             "status": "error",
             "message": "Dữ liệu đầu vào không hợp lệ",
             "code": "VALIDATION_ERROR",
-            "data": exc.errors(),
+            "data": errors,
             "timestamp": datetime.now(timezone.utc).isoformat()
         },
     )

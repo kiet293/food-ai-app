@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from typing import Optional
 from app.models.database import get_db
-from app.models.user_model import UserDB
+from app.users.models import UserDB
 from app.utils.security import SECRET_KEY, ALGORITHM
 
 # Báo cho hệ thống biết API nào dùng để cấp thẻ
