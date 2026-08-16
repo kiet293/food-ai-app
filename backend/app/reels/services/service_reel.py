@@ -81,6 +81,7 @@ class ReelService:
                     "likesCount": likes_count,
                     "isLiked": is_liked,
                     "commentsCount": comments_count,
+                    "viewsCount": reel.view_count,
                     "savesCount": 0,
                     "isSaved": False,
                     "sharesCount": 0,
@@ -362,5 +363,32 @@ class ReelService:
             raise CustomException(
                 message="Lỗi hệ thống khi đăng tải video ngắn",
                 code="UPLOAD_REEL_ERROR",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # tính view
+    @staticmethod
+    def increment_reel_view(db: Session, reel_id: int):
+        try:
+            reel = db.query(ReelDB).filter(ReelDB.id == reel_id).first()
+            if not reel:
+                raise CustomException(
+                    message="Không tìm thấy video ngắn",
+                    code="REEL_NOT_FOUND",
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            reel.view_count += 1
+            db.commit()
+            db.refresh(reel)
+            return {"viewsCount": reel.view_count}
+        except CustomException:
+            raise
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Lỗi khi tăng lượt xem video Reels: {e}")
+            raise CustomException(
+                message="Lỗi hệ thống khi tăng lượt xem",
+                code="VIEW_REEL_ERROR",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

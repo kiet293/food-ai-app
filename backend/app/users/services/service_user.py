@@ -37,7 +37,7 @@ class UserService:
                     "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
                     "caption": r.caption or "",
                     "likesCount": likes_cnt,
-                    "viewsCount": (r.id * 137) % 900 + 120
+                    "viewsCount": r.view_count
                 })
 
             # 4. Lấy danh sách Reels người dùng đã thích
@@ -52,7 +52,7 @@ class UserService:
                     "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
                     "caption": r.caption or "",
                     "likesCount": likes_cnt,
-                    "viewsCount": (r.id * 89) % 800 + 95
+                    "viewsCount": r.view_count
                 })
 
             # 5. Đếm số công thức đã lưu
@@ -199,7 +199,7 @@ class UserService:
                 "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
                 "caption": r.caption or "",
                 "likesCount": likes_cnt,
-                "viewsCount": (r.id * 137) % 900 + 120
+                "viewsCount": r.view_count
             })
 
         liked_reels_db = db.query(ReelDB).join(ReelLikeDB).filter(ReelLikeDB.user_id == user.id).order_by(ReelLikeDB.created_at.desc()).all()
@@ -213,7 +213,7 @@ class UserService:
                 "posterUrl": r.poster_url or "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
                 "caption": r.caption or "",
                 "likesCount": likes_cnt,
-                "viewsCount": (r.id * 89) % 800 + 95
+                "viewsCount": r.view_count
             })
 
         recent_recipes = db.query(RecipeDB).filter(

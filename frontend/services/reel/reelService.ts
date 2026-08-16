@@ -147,3 +147,14 @@ export const toggleCommentLike = async (commentId: number) => {
         throw error;
     }
 };
+
+// 7. Hàm tăng lượt xem video
+export const incrementReelView = async (dbId: number) => {
+    try {
+        const resData = await apiClient.post(`${REELS_API_URL}/${dbId}/view`);
+        return resData.data; // Trả về { viewsCount: number }
+    } catch (error) {
+        console.error("❌ Lỗi tăng lượt xem video:", error);
+        throw error;
+    }
+};

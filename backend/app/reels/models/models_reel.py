@@ -12,6 +12,7 @@ class ReelDB(Base):
     poster_url = Column(String, nullable=True)
     caption = Column(Text, nullable=True)
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=True)
+    view_count = Column(Integer, default=0, nullable=False)
 
     # Relationships
     author = relationship("UserDB", backref="reels")

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { fetchReels, toggleLikeReel } from '@/services/reel/reelService';
+import { fetchReels, toggleLikeReel, incrementReelView } from '@/services/reel/reelService';
 import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
@@ -62,6 +62,22 @@ export default function PlayScreen() {
       shouldDuckAndroid: false,
     }).catch(err => console.log('Audio mode error:', err));
   }, []);
+
+  // Tự động tăng lượt xem khi lướt sang video khác
+  useEffect(() => {
+    if (!activeReelId) return;
+    const dbId = parseInt(activeReelId.replace('reel-', ''), 10);
+    if (!isNaN(dbId)) {
+      incrementReelView(dbId).then(data => {
+        if (data && typeof data.viewsCount === 'number') {
+          // Cập nhật lượt xem thực tế trên UI cục bộ
+          setReels(prev =>
+            prev.map(r => (r.id === activeReelId ? { ...r, viewsCount: data.viewsCount } : r))
+          );
+        }
+      }).catch(err => console.log('Error incrementing reel view:', err));
+    }
+  }, [activeReelId]);
 
   // Hàm xử lý Thả tim/Bỏ thả tim đồng bộ Backend
   const toggleLike = async (reelId: string, dbId?: number) => {

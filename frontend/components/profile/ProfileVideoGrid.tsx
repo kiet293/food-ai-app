@@ -41,7 +41,7 @@ export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
                 <Image source={{ uri: reel.posterUrl }} style={styles.gridImage} />
                 <View style={styles.playCountOverlay}>
                   <Ionicons name="play-outline" size={14} color="#fff" style={{ marginRight: 3 }} />
-                  <Text style={styles.playCountText}>{reel.viewsCount || 587}</Text>
+                  <Text style={styles.playCountText}>{reel.viewsCount ?? 0}</Text>
                 </View>
               </TouchableOpacity>
             ))}

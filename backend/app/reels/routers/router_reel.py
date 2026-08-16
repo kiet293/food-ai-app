@@ -111,3 +111,16 @@ def upload_reel(
         data=data,
         message="Đăng tải video Reels thành công!"
     )
+
+
+# 8. API TĂNG LƯỢT XEM VIDEO REEL (POST /api/reels/{reel_id}/view)
+@router.post("/{reel_id}/view")
+def increment_view(
+    reel_id: int,
+    db: Session = Depends(get_db)
+):
+    data = ReelService.increment_reel_view(db, reel_id)
+    return success_response(
+        data=data,
+        message="Tăng lượt xem thành công!"
+    )
