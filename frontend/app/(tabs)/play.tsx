@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchReels, toggleLikeReel, incrementReelView } from '@/services/reel/reelService';
 import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
@@ -24,6 +25,10 @@ import ReelVideoItem, { ReelItem } from '@/components/reels/ReelVideoItem';
 const { height } = Dimensions.get('window');
 
 export default function PlayScreen() {
+  const { reelId } = useLocalSearchParams<{ reelId?: string }>();
+  const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   // Khởi tạo chiều cao
@@ -78,6 +83,21 @@ export default function PlayScreen() {
       }).catch(err => console.log('Error incrementing reel view:', err));
     }
   }, [activeReelId]);
+
+  // Tự động cuộn tới video được chỉ định từ Profile
+  useEffect(() => {
+    if (reelId && reels.length > 0) {
+      const idx = reels.findIndex(r => r.id === reelId || r.db_id?.toString() === reelId);
+      if (idx !== -1) {
+        setActiveReelId(reels[idx].id);
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index: idx, animated: false });
+        }, 100);
+        // Clear params to allow scrolling to the same video again next time
+        router.setParams({ reelId: undefined });
+      }
+    }
+  }, [reelId, reels]);
 
   // Hàm xử lý Thả tim/Bỏ thả tim đồng bộ Backend
   const toggleLike = async (reelId: string, dbId?: number) => {
@@ -162,6 +182,12 @@ export default function PlayScreen() {
     itemVisiblePercentThreshold: 70,
   }).current;
 
+  const getItemLayout = (data: any, index: number) => ({
+    length: reelHeight,
+    offset: reelHeight * index,
+    index,
+  });
+
   return (
     <View
       style={styles.container}
@@ -191,8 +217,10 @@ export default function PlayScreen() {
       ) : (
         /* Vertical Paging FlatList */
         <FlatList
+          ref={flatListRef}
           data={reels}
           keyExtractor={(item) => item.id}
+          getItemLayout={getItemLayout}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           decelerationRate="fast"

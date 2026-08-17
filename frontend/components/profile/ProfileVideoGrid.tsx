@@ -14,7 +14,7 @@ interface ProfileVideoGridProps {
   dynamicTextColor: string;
   dynamicSubTextColor: string;
   dynamicCardBg: string;
-  onNavigateToPlay: () => void;
+  onNavigateToPlay: (reelId: string) => void;
 }
 
 export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
@@ -36,7 +36,7 @@ export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
               <TouchableOpacity
                 key={reel.id || idx}
                 style={styles.gridSquare}
-                onPress={onNavigateToPlay}
+                onPress={() => onNavigateToPlay(reel.id)}
               >
                 <Image source={{ uri: reel.posterUrl }} style={styles.gridImage} />
                 <View style={styles.playCountOverlay}>
@@ -101,7 +101,7 @@ export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
               <TouchableOpacity
                 key={reel.id || idx}
                 style={styles.gridSquare}
-                onPress={onNavigateToPlay}
+                onPress={() => onNavigateToPlay(reel.id)}
               >
                 <Image source={{ uri: reel.posterUrl }} style={styles.gridImage} />
                 <View style={styles.playCountOverlay}>

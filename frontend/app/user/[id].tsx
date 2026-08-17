@@ -182,7 +182,7 @@ export default function UserProfileScreen() {
           dynamicTextColor={dynamicTextColor}
           dynamicSubTextColor={dynamicSubTextColor}
           dynamicCardBg={dynamicCardBg}
-          onNavigateToPlay={() => router.push('/play')}
+          onNavigateToPlay={(reelId) => router.push({ pathname: '/play', params: { reelId } })}
         />
       </ScrollView>
     </SafeAreaView>
