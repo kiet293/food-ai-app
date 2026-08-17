@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query  # type: ignore
+from fastapi import APIRouter, Depends, Query, BackgroundTasks  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from typing import Optional
 
@@ -51,10 +51,11 @@ def get_user_following(
 @router.post("/{id}/follow")
 def follow_user(
     id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    data = UserService.follow_user(db=db, target_user_id=id, current_user=current_user)
+    data = UserService.follow_user(db=db, target_user_id=id, current_user=current_user, background_tasks=background_tasks)
     if data.get("already"):
         return success_response(message="Bạn đã theo dõi người dùng này rồi!", data={"isFollowing": True})
     return success_response(message="Theo dõi người dùng thành công!", data={"isFollowing": True})

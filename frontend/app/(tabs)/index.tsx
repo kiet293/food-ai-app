@@ -76,7 +76,7 @@ import { SaveToCollectionModal } from '@/components/collections/SaveToCollection
 
 export default function HomeScreen() {
   const [userAvatar, setUserAvatar] = useState<string>('👨‍🍳');
-  const [userInfo, setUserInfo] = useState<{ full_name: string } | null>(null);
+  const [userInfo, setUserInfo] = useState<any | null>(null);
 
   const [activeTab, setActiveTab] = useState<'GLOBAL' | 'FOLLOWING'>('GLOBAL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +166,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header Cá Nhân */}
-      <HomeHeader userAvatar={userAvatar} fullName={userInfo?.full_name || 'Đầu Bếp Tại Gia'} />
+      <HomeHeader userAvatar={userAvatar} fullName={userInfo?.full_name || 'Đầu Bếp Tại Gia'} userId={userInfo?.id} />
 
       {/* Thanh Tìm Kiếm Đa Năng */}
       <ExploreSearchBar

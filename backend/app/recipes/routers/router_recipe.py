@@ -183,10 +183,11 @@ def update_recipe(
 def rate_recipe(
     recipe_id: int, 
     request: RateRecipeRequest, 
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db), 
     current_user: UserDB = Depends(get_current_user)
 ):
-    RecipeService.rate_recipe(db, recipe_id, current_user, request)
+    RecipeService.rate_recipe(db, recipe_id, current_user, request, background_tasks)
     return success_response(message="Đánh giá công thức thành công!")
 
 

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile, HTTPException, BackgroundTasks
 import cloudinary.uploader
 from typing import Optional
 from datetime import datetime
@@ -9,6 +9,8 @@ from app.users.schemas import UserUpdate
 from app.recipes.models import RecipeDB, FavoriteDB
 from app.collections.models import CollectionDB, CollectionRecipeDB
 from app.reels.models import ReelDB, ReelLikeDB
+from app.notifications.services import NotificationService
+from app.notifications.schemas import NotificationCreate
 from app.utils.response import CustomException
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80"
@@ -335,7 +337,7 @@ class UserService:
         }
 
     @staticmethod
-    def follow_user(db: Session, target_user_id: int, current_user: UserDB):
+    def follow_user(db: Session, target_user_id: int, current_user: UserDB, background_tasks: Optional[BackgroundTasks] = None):
         try:
             if current_user.id == target_user_id:
                 raise CustomException(
@@ -367,6 +369,19 @@ class UserService:
             db.add(new_follow)
             target_user.follower_count = (target_user.follower_count or 0) + 1
             db.commit()
+
+            # Gửi thông báo FOLLOW
+            try:
+                notify_in = NotificationCreate(
+                    user_id=target_user_id,
+                    type="FOLLOW",
+                    reference_type="user",
+                    reference_id=current_user.id,
+                    actor_id=current_user.id
+                )
+                NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+            except Exception as ex:
+                print(f"⚠️ Không thể tạo thông báo Follow: {ex}")
             
             return {"isFollowing": True, "already": False}
         except CustomException:

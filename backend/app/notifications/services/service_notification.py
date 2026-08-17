@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, BackgroundTasks
 
 from app.notifications.models import NotificationDB, NotificationSettingsDB
 from app.notifications.schemas import (
@@ -8,11 +8,36 @@ from app.notifications.schemas import (
     NotificationResponse,
     NotificationSettingsUpdate
 )
+from app.users.models import UserDB
 from app.utils.response import CustomException
 
 class NotificationService:
     @staticmethod
-    def create_notification(db: Session, notification_in: NotificationCreate) -> NotificationDB:
+    def generate_message(n: NotificationDB, db: Session) -> str:
+        actor_name = "Một người dùng"
+        if n.actor_id:
+            actor = db.query(UserDB).filter(UserDB.id == n.actor_id).first()
+            if actor:
+                actor_name = actor.full_name or actor.username
+
+        if n.type == 'FOLLOW':
+            return f"{actor_name} đã bắt đầu theo dõi bạn."
+        elif n.type == 'LIKE':
+            return f"{actor_name} đã thích công thức của bạn."
+        elif n.type == 'COMMENT':
+            return f"{actor_name} đã bình luận về công thức của bạn."
+        elif n.type == 'RATING':
+            return f"{actor_name} đã đánh giá công thức của bạn."
+        elif n.type == 'NEW_RECIPE':
+            return f"{actor_name} đã đăng một công thức nấu ăn mới."
+        return "Bạn có thông báo mới."
+
+    @staticmethod
+    def create_notification(
+        db: Session,
+        notification_in: NotificationCreate,
+        background_tasks: Optional[BackgroundTasks] = None
+    ) -> Optional[NotificationDB]:
         try:
             # 1. Kiểm tra cài đặt nhận thông báo của User
             settings = NotificationService.get_settings(db, notification_in.user_id)
@@ -37,11 +62,49 @@ class NotificationService:
                 type=notification_in.type,
                 reference_type=notification_in.reference_type,
                 reference_id=notification_in.reference_id,
+                actor_id=notification_in.actor_id,
                 is_read=False
             )
             db.add(db_notification)
             db.commit()
             db.refresh(db_notification)
+
+            # 3. Gửi WebSockets thời gian thực nếu có background_tasks
+            if db_notification and background_tasks:
+                message = NotificationService.generate_message(db_notification, db)
+                actor_data = None
+                if db_notification.actor_id:
+                    actor = db.query(UserDB).filter(UserDB.id == db_notification.actor_id).first()
+                    if actor:
+                        actor_data = {
+                            "id": actor.id,
+                            "name": actor.full_name or actor.username,
+                            "username": actor.username,
+                            "avatar": actor.avatar
+                        }
+
+                payload = {
+                    "type": "NEW_NOTIFICATION",
+                    "data": {
+                        "id": db_notification.id,
+                        "user_id": db_notification.user_id,
+                        "type": db_notification.type,
+                        "reference_type": db_notification.reference_type,
+                        "reference_id": db_notification.reference_id,
+                        "is_read": db_notification.is_read,
+                        "created_at": db_notification.created_at.isoformat() if db_notification.created_at else None,
+                        "message": message,
+                        "actor": actor_data
+                    }
+                }
+
+                async def send_ws():
+                    from app.utils.ws_manager import manager
+                    # room_id = USER_NOTIFY_{user_id}
+                    await manager.broadcast_to_recipe(f"USER_NOTIFY_{db_notification.user_id}", payload)
+
+                background_tasks.add_task(send_ws)
+
             return db_notification
         except Exception as e:
             db.rollback()
@@ -57,18 +120,18 @@ class NotificationService:
 
             result = []
             for n in notifications:
-                # Sinh message động dựa theo loại thông báo
-                message = "Bạn có thông báo mới"
-                if n.type == 'FOLLOW':
-                    message = "Một người dùng đã bắt đầu theo dõi bạn."
-                elif n.type == 'LIKE':
-                    message = "Có người thích bài viết của bạn."
-                elif n.type == 'COMMENT':
-                    message = "Có người bình luận về bài viết của bạn."
-                elif n.type == 'RATING':
-                    message = "Có người đánh giá công thức nấu ăn của bạn."
-                elif n.type == 'NEW_RECIPE':
-                    message = "Có công thức nấu ăn mới dành cho bạn."
+                message = NotificationService.generate_message(n, db)
+                
+                actor_data = None
+                if n.actor_id:
+                    actor = db.query(UserDB).filter(UserDB.id == n.actor_id).first()
+                    if actor:
+                        actor_data = {
+                            "id": actor.id,
+                            "name": actor.full_name or actor.username,
+                            "username": actor.username,
+                            "avatar": actor.avatar
+                        }
 
                 result.append({
                     "id": n.id,
@@ -77,8 +140,9 @@ class NotificationService:
                     "reference_type": n.reference_type,
                     "reference_id": n.reference_id,
                     "is_read": n.is_read,
-                    "created_at": n.created_at,
-                    "message": message
+                    "created_at": n.created_at.isoformat() if n.created_at else None,
+                    "message": message,
+                    "actor": actor_data
                 })
             return result
         except Exception as e:

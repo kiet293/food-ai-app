@@ -21,6 +21,8 @@ from app.recipes.models import (
 )
 from app.users.models import UserDB, FollowDB
 from app.recipes.schemas import AIAnalysisResult, RateRecipeRequest
+from app.notifications.services import NotificationService
+from app.notifications.schemas import NotificationCreate
 from app.utils.response import CustomException
 
 DEFAULT_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&q=80"
@@ -759,7 +761,7 @@ class RecipeService:
             )
 
     @staticmethod
-    def rate_recipe(db: Session, recipe_id: int, current_user: UserDB, request: RateRecipeRequest):
+    def rate_recipe(db: Session, recipe_id: int, current_user: UserDB, request: RateRecipeRequest, background_tasks: Optional[BackgroundTasks] = None):
         try:
             recipe = db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
             if not recipe:
@@ -793,6 +795,21 @@ class RecipeService:
                 db.add(new_comment)
                 
             db.commit()
+
+            # Gửi thông báo RATING
+            if recipe.user_id != current_user.id:
+                try:
+                    notify_in = NotificationCreate(
+                        user_id=recipe.user_id,
+                        type="RATING",
+                        reference_type="recipe",
+                        reference_id=recipe.id,
+                        actor_id=current_user.id
+                    )
+                    NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                except Exception as ex:
+                    print(f"⚠️ Không thể tạo thông báo Đánh giá: {ex}")
+
             return True
         except Exception as e:
             db.rollback()
@@ -846,6 +863,20 @@ class RecipeService:
             db.add(new_comment)
             db.commit()
             db.refresh(new_comment)
+
+            # Gửi thông báo COMMENT
+            if recipe.user_id != current_user.id:
+                try:
+                    notify_in = NotificationCreate(
+                        user_id=recipe.user_id,
+                        type="COMMENT",
+                        reference_type="recipe",
+                        reference_id=recipe.id,
+                        actor_id=current_user.id
+                    )
+                    NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                except Exception as ex:
+                    print(f"⚠️ Không thể tạo thông báo Comment: {ex}")
 
             total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
             async def broadcast():
@@ -1004,6 +1035,20 @@ class RecipeService:
             new_favorite = FavoriteDB(recipe_id=recipe_id, user_id=current_user.id)
             db.add(new_favorite)
             db.commit()
+
+            # Gửi thông báo LIKE (Yêu thích)
+            if recipe.user_id != current_user.id:
+                try:
+                    notify_in = NotificationCreate(
+                        user_id=recipe.user_id,
+                        type="LIKE",
+                        reference_type="recipe",
+                        reference_id=recipe.id,
+                        actor_id=current_user.id
+                    )
+                    NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                except Exception as ex:
+                    print(f"⚠️ Không thể tạo thông báo Favorite: {ex}")
 
             total = db.query(FavoriteDB).filter(FavoriteDB.recipe_id == recipe_id).count()
             async def broadcast():

@@ -14,8 +14,11 @@ class NotificationDB(Base):
     is_read = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+
     # Relationship
-    user = relationship("UserDB", backref="notifications")
+    user = relationship("UserDB", backref="notifications", foreign_keys=[user_id])
+    actor = relationship("UserDB", foreign_keys=[actor_id])
 
 
 class NotificationSettingsDB(Base):
