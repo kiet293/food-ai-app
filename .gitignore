@@ -39,3 +39,4 @@ Thumbs.db
 # AI Models / Weights
 *.pt
 backend/app/ai/best.pt
+!backend/app/modules/ai/models/egg_tomato_beff.pt

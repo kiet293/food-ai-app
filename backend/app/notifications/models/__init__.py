@@ -1,1 +1,0 @@
-from .models_notification import NotificationDB, NotificationSettingsDB
