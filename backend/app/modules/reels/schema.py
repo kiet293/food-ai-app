@@ -9,3 +9,4 @@ class ReelCreate(BaseModel):
 
 class ReelCommentCreate(BaseModel):
     content: str
+    parent_comment_id: Optional[int] = None

@@ -59,15 +59,29 @@ def get_user_notifications(
     return success_response(data=data, message="Lấy danh sách thông báo thành công")
 
 
-# 5. REST API: ĐÁNH DẤU THÔNG BÁO ĐÃ ĐỌC (PUT /api/notifications/{id}/read)
+# 5. REST API: CẬP NHẬT TRẠNG THÁI ĐỌC THÔNG BÁO (PUT /api/notifications/{id}/read)
 @router.put("/api/notifications/{notification_id}/read")
 def mark_notification_as_read(
+    notification_id: int,
+    is_read: bool = True,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    NotificationService.mark_as_read(db=db, notification_id=notification_id, user_id=current_user.id, is_read=is_read)
+    msg = "Đã đánh dấu thông báo đã đọc" if is_read else "Đã đánh dấu thông báo chưa đọc"
+    return success_response(message=msg)
+
+
+# 5.1 REST API: XÓA THÔNG BÁO (DELETE /api/notifications/{id})
+@router.delete("/api/notifications/{notification_id}")
+def delete_notification(
     notification_id: int,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    NotificationService.mark_as_read(db=db, notification_id=notification_id, user_id=current_user.id)
-    return success_response(message="Đã đánh dấu thông báo đã đọc")
+    NotificationService.delete_notification(db=db, notification_id=notification_id, user_id=current_user.id)
+    return success_response(message="Đã xóa thông báo thành công")
+
 
 
 # 6. REST API: LẤY CÀI ĐẶT THÔNG BÁO (GET /api/notifications/settings)

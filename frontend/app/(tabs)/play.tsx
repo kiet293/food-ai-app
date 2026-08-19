@@ -25,7 +25,7 @@ import ReelVideoItem, { ReelItem } from '@/components/reels/ReelVideoItem';
 const { height } = Dimensions.get('window');
 
 export default function PlayScreen() {
-  const { reelId } = useLocalSearchParams<{ reelId?: string }>();
+  const { reelId, openComments } = useLocalSearchParams<{ reelId?: string; openComments?: string }>();
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
 
@@ -93,11 +93,17 @@ export default function PlayScreen() {
         setTimeout(() => {
           flatListRef.current?.scrollToIndex({ index: idx, animated: false });
         }, 100);
+
+        if (openComments === 'true') {
+          setActiveReelForModal(reels[idx]);
+          setIsCommentModalOpen(true);
+        }
+
         // Clear params to allow scrolling to the same video again next time
-        router.setParams({ reelId: undefined });
+        router.setParams({ reelId: undefined, openComments: undefined });
       }
     }
-  }, [reelId, reels]);
+  }, [reelId, reels, openComments]);
 
   // Hàm xử lý Thả tim/Bỏ thả tim đồng bộ Backend
   const toggleLike = async (reelId: string, dbId?: number) => {

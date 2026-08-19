@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
-from sqlalchemy.orm import relationship  # type: ignore
+from sqlalchemy.orm import relationship, backref  # type: ignore
 from app.db import Base
 
 class ReelDB(Base):
@@ -41,10 +41,12 @@ class ReelCommentDB(Base):
     reel_id = Column(Integer, ForeignKey("reels.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
+    parent_comment_id = Column(Integer, ForeignKey("reel_comments.id", ondelete="CASCADE"), nullable=True)
 
     # Relationship to get commenter info easily
     user = relationship("UserDB")
     likes = relationship("ReelCommentLikeDB", backref="comment", cascade="all, delete-orphan")
+    replies = relationship("ReelCommentDB", backref=backref("parent", remote_side=[id]), cascade="all, delete-orphan")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

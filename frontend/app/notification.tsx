@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   StatusBar,
   Pressable,
+  Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
@@ -20,6 +22,8 @@ export default function NotificationScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [isOptionsModalVisible, setIsOptionsModalVisible] = useState<boolean>(false);
 
   const loadNotifications = async () => {
     setIsLoading(true);
@@ -41,7 +45,7 @@ export default function NotificationScreen() {
 
   const handleNotificationPress = async (item: NotificationItem) => {
     if (!item.is_read) {
-      await notificationService.markAsRead(item.id);
+      await notificationService.markAsRead(item.id, true);
       setNotifications((prev) =>
         prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n))
       );
@@ -49,9 +53,46 @@ export default function NotificationScreen() {
 
     if (item.type === 'FOLLOW' && item.actor) {
       router.push({ pathname: '/user/[id]', params: { id: item.actor.id } });
-    } else if ((item.type === 'LIKE' || item.type === 'COMMENT' || item.type === 'RATING') && item.reference_id) {
-      router.push({ pathname: '/explore-detail/[id]', params: { id: item.reference_id } });
+    } else if (item.type === 'COMMENT' && item.reference_id) {
+      if (item.reference_type === 'reel') {
+        router.push({ pathname: '/(tabs)/play', params: { reelId: item.reference_id.toString(), openComments: 'true' } });
+      } else {
+        router.push({ pathname: '/recipe/[id]', params: { id: item.reference_id, tab: 'comments' } });
+      }
+    } else if ((item.type === 'LIKE' || item.type === 'RATING') && item.reference_id) {
+      if (item.reference_type === 'reel' || item.reference_type === 'reel_comment') {
+        router.push({ pathname: '/(tabs)/play', params: { reelId: item.reference_id.toString() } });
+      } else {
+        router.push({ pathname: '/recipe/[id]', params: { id: item.reference_id } });
+      }
     }
+  };
+
+  const handleOpenOptions = (item: NotificationItem) => {
+    setSelectedNotification(item);
+    setIsOptionsModalVisible(true);
+  };
+
+  const handleToggleReadStatus = async () => {
+    if (!selectedNotification) return;
+    const newReadStatus = !selectedNotification.is_read;
+    
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === selectedNotification.id ? { ...n, is_read: newReadStatus } : n))
+    );
+    setIsOptionsModalVisible(false);
+
+    await notificationService.markAsRead(selectedNotification.id, newReadStatus);
+  };
+
+  const handleDeleteNotification = async () => {
+    if (!selectedNotification) return;
+    const targetId = selectedNotification.id;
+
+    setNotifications((prev) => prev.filter((n) => n.id !== targetId));
+    setIsOptionsModalVisible(false);
+
+    await notificationService.deleteNotification(targetId);
   };
 
   const handleMarkAllRead = async () => {
@@ -165,7 +206,16 @@ export default function NotificationScreen() {
           <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
         </View>
 
-        {!item.is_read && <View style={styles.unreadDot} />}
+        <View style={styles.rightActions}>
+          <TouchableOpacity 
+            style={styles.optionsButton} 
+            onPress={() => handleOpenOptions(item)}
+            hitSlop={12}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#64748b" />
+          </TouchableOpacity>
+          {!item.is_read && <View style={styles.unreadDot} />}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -178,17 +228,25 @@ export default function NotificationScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={15}>
-          <Ionicons name="arrow-back-outline" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông báo</Text>
-        <TouchableOpacity 
-          onPress={handleMarkAllRead} 
-          style={styles.markReadButton}
-          disabled={!hasUnread}
-        >
-          <Text style={[styles.markReadText, !hasUnread && styles.disabledMarkReadText]}>Đọc tất cả</Text>
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={15}>
+            <Ionicons name="arrow-back-outline" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Thông báo</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.headerIconButton} hitSlop={10}>
+            <Ionicons name="search-outline" size={20} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleMarkAllRead} 
+            style={[styles.headerIconButton, !hasUnread && { opacity: 0.5 }]}
+            disabled={!hasUnread}
+            hitSlop={10}
+          >
+            <Ionicons name="checkmark-done-outline" size={22} color={hasUnread ? "#1877f2" : "#94a3b8"} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Body */}
@@ -222,6 +280,54 @@ export default function NotificationScreen() {
           refreshing={isRefreshing}
         />
       )}
+
+      {/* Options Modal for Ellipsis Menu */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isOptionsModalVisible}
+        onRequestClose={() => setIsOptionsModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={() => setIsOptionsModalVisible(false)}
+        >
+          <View style={styles.optionsModalContainer}>
+            <View style={styles.modalHeaderIndicator} />
+            <Text style={styles.optionsModalTitle} numberOfLines={2}>
+              Tùy chọn thông báo
+            </Text>
+            
+            <TouchableOpacity style={styles.optionsModalBtn} onPress={handleToggleReadStatus}>
+              <View style={styles.optionsBtnIconContainer}>
+                <Ionicons 
+                  name={selectedNotification?.is_read ? "mail-unread-outline" : "mail-open-outline"} 
+                  size={20} 
+                  color="#475569" 
+                />
+              </View>
+              <Text style={styles.optionsBtnText}>
+                {selectedNotification?.is_read ? 'Đánh dấu là chưa đọc' : 'Đánh dấu là đã đọc'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.optionsModalBtn} onPress={handleDeleteNotification}>
+              <View style={[styles.optionsBtnIconContainer, { backgroundColor: '#fee2e2' }]}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </View>
+              <Text style={[styles.optionsBtnText, { color: '#ef4444' }]}>Xóa thông báo này</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.optionsModalBtn, styles.cancelBtn]} 
+              onPress={() => setIsOptionsModalVisible(false)}
+            >
+              <Text style={styles.cancelBtnText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -245,6 +351,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     padding: 4,
@@ -328,10 +452,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   unreadCard: {
-    backgroundColor: '#f0fbf7', // Light green tint
+    backgroundColor: '#e7f3ff', // Facebook unread background tint
     borderLeftWidth: 4,
-    borderLeftColor: '#10B981',
-    paddingLeft: 16, // Adjust padding due to borderLeft
+    borderLeftColor: '#1877f2', // Facebook blue
+    paddingLeft: 16,
   },
   avatarContainer: {
     position: 'relative',
@@ -374,11 +498,82 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 4,
   },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    gap: 8,
+  },
+  optionsButton: {
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginLeft: 12,
+    backgroundColor: '#1877f2', // Facebook blue
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  optionsModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingTop: 12,
+  },
+  modalHeaderIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#cbd5e1',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  optionsModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  optionsModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  optionsBtnIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  optionsBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  cancelBtn: {
+    marginTop: 10,
+    justifyContent: 'center',
+    borderBottomWidth: 0,
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748b',
+    textAlign: 'center',
+    width: '100%',
   },
 });

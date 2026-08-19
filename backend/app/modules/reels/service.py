@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from fastapi import UploadFile, status
+from fastapi import UploadFile, status, BackgroundTasks
 import cloudinary.uploader
 from typing import Optional
 
@@ -8,6 +8,8 @@ from app.modules.recipes.model import RecipeDB
 from app.modules.reels.model import ReelCommentDB, ReelCommentLikeDB, ReelDB, ReelLikeDB
 from app.modules.reels.schema import ReelCreate
 from app.modules.users.model import FollowDB, UserDB
+from app.modules.notifications.service import NotificationService
+from app.modules.notifications.schema import NotificationCreate
 from .pexels_service import PexelsService
 
 class ReelService:
@@ -134,7 +136,7 @@ class ReelService:
             )
 
     @staticmethod
-    def toggle_reel_like(db: Session, current_user: UserDB, reel_id: int):
+    def toggle_reel_like(db: Session, current_user: UserDB, reel_id: int, background_tasks: Optional[BackgroundTasks] = None):
         try:
             reel = db.query(ReelDB).filter(ReelDB.id == reel_id).first()
             if not reel:
@@ -157,6 +159,21 @@ class ReelService:
                 new_like = ReelLikeDB(reel_id=reel_id, user_id=current_user.id)
                 db.add(new_like)
                 db.commit()
+
+                # Gửi thông báo LIKE Reel
+                if reel.user_id != current_user.id:
+                    try:
+                        notify_in = NotificationCreate(
+                            user_id=reel.user_id,
+                            type="LIKE",
+                            reference_type="reel",
+                            reference_id=reel.id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                    except Exception as ex:
+                        print(f"⚠️ Không thể tạo thông báo Like Reel: {ex}")
+
                 return {"isLiked": True}
         except CustomException:
             raise
@@ -198,6 +215,7 @@ class ReelService:
                         "avatar": c.user.avatar
                     },
                     "content": c.content,
+                    "parent_comment_id": c.parent_comment_id,
                     "created_at": c.created_at.isoformat() if c.created_at else None,
                     "likesCount": likes_count,
                     "isLiked": is_liked
@@ -212,7 +230,7 @@ class ReelService:
             )
 
     @staticmethod
-    def create_reel_comment(db: Session, current_user: UserDB, reel_id: int, content: str):
+    def create_reel_comment(db: Session, current_user: UserDB, reel_id: int, content: str, parent_comment_id: Optional[int] = None, background_tasks: Optional[BackgroundTasks] = None):
         try:
             reel = db.query(ReelDB).filter(ReelDB.id == reel_id).first()
             if not reel:
@@ -229,15 +247,54 @@ class ReelService:
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
 
+            if parent_comment_id:
+                parent = db.query(ReelCommentDB).filter(ReelCommentDB.id == parent_comment_id).first()
+                if not parent:
+                    raise CustomException(
+                        message="Bình luận gốc không tồn tại",
+                        code="PARENT_COMMENT_NOT_FOUND",
+                        status_code=status.HTTP_404_NOT_FOUND
+                    )
+
             new_comment = ReelCommentDB(
                 reel_id=reel_id,
                 user_id=current_user.id,
-                content=content.strip()
+                content=content.strip(),
+                parent_comment_id=parent_comment_id
             )
 
             db.add(new_comment)
             db.commit()
             db.refresh(new_comment)
+
+            # Gửi thông báo COMMENT Reel / REPLY Reel Comment
+            if parent_comment_id:
+                try:
+                    parent = db.query(ReelCommentDB).filter(ReelCommentDB.id == parent_comment_id).first()
+                    if parent and parent.user_id != current_user.id:
+                        notify_in = NotificationCreate(
+                            user_id=parent.user_id,
+                            type="COMMENT",
+                            reference_type="reel_comment",
+                            reference_id=reel.id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                except Exception as ex:
+                    print(f"⚠️ Không thể tạo thông báo Reply Comment Reel: {ex}")
+            else:
+                if reel.user_id != current_user.id:
+                    try:
+                        notify_in = NotificationCreate(
+                            user_id=reel.user_id,
+                            type="COMMENT",
+                            reference_type="reel",
+                            reference_id=reel.id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                    except Exception as ex:
+                        print(f"⚠️ Không thể tạo thông báo Comment Reel: {ex}")
 
             return {
                 "id": new_comment.id,
@@ -247,6 +304,7 @@ class ReelService:
                     "avatar": current_user.avatar
                 },
                 "content": new_comment.content,
+                "parent_comment_id": new_comment.parent_comment_id,
                 "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None,
                 "likesCount": 0,
                 "isLiked": False
@@ -263,7 +321,7 @@ class ReelService:
             )
 
     @staticmethod
-    def toggle_reel_comment_like(db: Session, current_user: UserDB, comment_id: int):
+    def toggle_reel_comment_like(db: Session, current_user: UserDB, comment_id: int, background_tasks: Optional[BackgroundTasks] = None):
         try:
             comment = db.query(ReelCommentDB).filter(ReelCommentDB.id == comment_id).first()
             if not comment:
@@ -286,6 +344,21 @@ class ReelService:
                 new_like = ReelCommentLikeDB(comment_id=comment_id, user_id=current_user.id)
                 db.add(new_like)
                 db.commit()
+
+                # Gửi thông báo LIKE Reel Comment
+                if comment.user_id != current_user.id:
+                    try:
+                        notify_in = NotificationCreate(
+                            user_id=comment.user_id,
+                            type="LIKE",
+                            reference_type="reel_comment",
+                            reference_id=comment.reel_id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                    except Exception as ex:
+                        print(f"⚠️ Không thể tạo thông báo Like Reel Comment: {ex}")
+
                 return {"isLiked": True}
         except CustomException:
             raise

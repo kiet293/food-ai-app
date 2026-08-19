@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Body, UploadFile, File, Form  # type: ignore
+from fastapi import APIRouter, Depends, Body, UploadFile, File, Form, BackgroundTasks  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from typing import Optional
 
@@ -42,10 +42,11 @@ def create_reel(
 @router.post("/{reel_id}/like")
 def toggle_like_reel(
     reel_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    data = ReelService.toggle_reel_like(db, current_user, reel_id)
+    data = ReelService.toggle_reel_like(db, current_user, reel_id, background_tasks)
     message = "Đã thích video!" if data.get("isLiked") else "Đã bỏ thích video!"
     return success_response(
         data=data,
@@ -71,11 +72,12 @@ def get_reel_comments(
 @router.post("/{reel_id}/comments")
 def create_reel_comment(
     reel_id: int,
+    background_tasks: BackgroundTasks,
     comment_data: ReelCommentCreate = Body(...),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    data = ReelService.create_reel_comment(db, current_user, reel_id, comment_data.content)
+    data = ReelService.create_reel_comment(db, current_user, reel_id, comment_data.content, comment_data.parent_comment_id, background_tasks)
     return success_response(
         data=data,
         message="Bình luận đã được đăng thành công!"
@@ -86,10 +88,11 @@ def create_reel_comment(
 @router.post("/comments/{comment_id}/like")
 def toggle_like_reel_comment(
     comment_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    data = ReelService.toggle_reel_comment_like(db, current_user, comment_id)
+    data = ReelService.toggle_reel_comment_like(db, current_user, comment_id, background_tasks)
     message = "Đã thích bình luận!" if data.get("isLiked") else "Đã bỏ thích bình luận!"
     return success_response(
         data=data,

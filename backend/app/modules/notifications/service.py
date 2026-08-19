@@ -23,9 +23,23 @@ class NotificationService:
         if n.type == 'FOLLOW':
             return f"{actor_name} đã bắt đầu theo dõi bạn."
         elif n.type == 'LIKE':
-            return f"{actor_name} đã thích công thức của bạn."
+            if n.reference_type == 'reel':
+                return f"{actor_name} đã thích video ngắn của bạn."
+            elif n.reference_type == 'reel_comment':
+                return f"{actor_name} đã thích bình luận của bạn trên video ngắn."
+            elif n.reference_type == 'recipe_comment':
+                return f"{actor_name} đã thích bình luận của bạn."
+            else:
+                return f"{actor_name} đã thích công thức của bạn."
         elif n.type == 'COMMENT':
-            return f"{actor_name} đã bình luận về công thức của bạn."
+            if n.reference_type == 'reel':
+                return f"{actor_name} đã bình luận về video ngắn của bạn."
+            elif n.reference_type == 'reel_comment':
+                return f"{actor_name} đã trả lời bình luận của bạn trên video ngắn."
+            elif n.reference_type == 'comment':
+                return f"{actor_name} đã trả lời bình luận của bạn."
+            else:
+                return f"{actor_name} đã bình luận về công thức của bạn."
         elif n.type == 'RATING':
             return f"{actor_name} đã đánh giá công thức của bạn."
         elif n.type == 'NEW_RECIPE':
@@ -154,7 +168,7 @@ class NotificationService:
             )
 
     @staticmethod
-    def mark_as_read(db: Session, notification_id: int, user_id: int) -> bool:
+    def mark_as_read(db: Session, notification_id: int, user_id: int, is_read: bool = True) -> bool:
         try:
             notification = db.query(NotificationDB).filter(
                 NotificationDB.id == notification_id,
@@ -166,19 +180,48 @@ class NotificationService:
                     code="NOTIFICATION_NOT_FOUND",
                     status_code=status.HTTP_404_NOT_FOUND
                 )
-            notification.is_read = True
+            notification.is_read = is_read
             db.commit()
             return True
         except CustomException:
             raise
         except Exception as e:
             db.rollback()
-            print(f"❌ Lỗi khi đánh dấu thông báo đã đọc: {e}")
+            print(f"❌ Lỗi khi cập nhật trạng thái đọc của thông báo: {e}")
             raise CustomException(
                 message="Không thể cập nhật thông báo",
                 code="MARK_READ_ERROR",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    # xóa thông báo
+    @staticmethod
+    def delete_notification(db: Session, notification_id: int, user_id: int) -> bool:
+        try:
+            notification = db.query(NotificationDB).filter(
+                NotificationDB.id == notification_id,
+                NotificationDB.user_id == user_id
+            ).first()
+            if not notification:
+                raise CustomException(
+                    message="Không tìm thấy thông báo",
+                    code="NOTIFICATION_NOT_FOUND",
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+            db.delete(notification)
+            db.commit()
+            return True
+        except CustomException:
+            raise
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Lỗi khi xóa thông báo: {e}")
+            raise CustomException(
+                message="Không thể xóa thông báo",
+                code="DELETE_NOTIFICATION_ERROR",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
     @staticmethod
     def get_settings(db: Session, user_id: int) -> NotificationSettingsDB:

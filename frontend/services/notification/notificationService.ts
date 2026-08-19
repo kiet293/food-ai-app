@@ -45,12 +45,22 @@ export const notificationService = {
     }
   },
 
-  markAsRead: async (notificationId: number): Promise<boolean> => {
+  markAsRead: async (notificationId: number, isRead: boolean = true): Promise<boolean> => {
     try {
-      const response = await apiClient.put(`${API_BASE_URL}/notifications/${notificationId}/read`);
+      const response = await apiClient.put(`${API_BASE_URL}/notifications/${notificationId}/read?is_read=${isRead}`);
       return response.status === 'success';
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('Error marking notification read status:', error);
+      return false;
+    }
+  },
+
+  deleteNotification: async (notificationId: number): Promise<boolean> => {
+    try {
+      const response = await apiClient.delete(`${API_BASE_URL}/notifications/${notificationId}`);
+      return response.status === 'success';
+    } catch (error) {
+      console.error('Error deleting notification:', error);
       return false;
     }
   },

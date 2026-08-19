@@ -865,19 +865,34 @@ class RecipeService:
             db.commit()
             db.refresh(new_comment)
 
-            # Gửi thông báo COMMENT
-            if recipe.user_id != current_user.id:
+            # Gửi thông báo COMMENT / REPLY
+            if parent_comment_id:
                 try:
-                    notify_in = NotificationCreate(
-                        user_id=recipe.user_id,
-                        type="COMMENT",
-                        reference_type="recipe",
-                        reference_id=recipe.id,
-                        actor_id=current_user.id
-                    )
-                    NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                    parent = db.query(CommentDB).filter(CommentDB.id == parent_comment_id).first()
+                    if parent and parent.user_id != current_user.id:
+                        notify_in = NotificationCreate(
+                            user_id=parent.user_id,
+                            type="COMMENT",
+                            reference_type="comment",
+                            reference_id=recipe.id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
                 except Exception as ex:
-                    print(f"⚠️ Không thể tạo thông báo Comment: {ex}")
+                    print(f"⚠️ Không thể tạo thông báo Reply Comment: {ex}")
+            else:
+                if recipe.user_id != current_user.id:
+                    try:
+                        notify_in = NotificationCreate(
+                            user_id=recipe.user_id,
+                            type="COMMENT",
+                            reference_type="recipe",
+                            reference_id=recipe.id,
+                            actor_id=current_user.id
+                        )
+                        NotificationService.create_notification(db=db, notification_in=notify_in, background_tasks=background_tasks)
+                    except Exception as ex:
+                        print(f"⚠️ Không thể tạo thông báo Comment: {ex}")
 
             total_comments = db.query(CommentDB).filter(CommentDB.recipe_id == recipe_id).count()
             async def broadcast():
