@@ -1,21 +1,92 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Image, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { getApiBaseUrl } from '../../services/shared/apiConfig';
+import { notificationService } from '../../services/notification/notificationService';
 
 interface HomeHeaderProps {
   userAvatar: string;
   fullName: string;
+  userId?: number;
 }
 
-export const HomeHeader: React.FC<HomeHeaderProps> = ({ userAvatar, fullName }) => {
+export const HomeHeader: React.FC<HomeHeaderProps> = ({ userAvatar, fullName, userId }) => {
   const router = useRouter();
+  const [hasUnread, setHasUnread] = useState<boolean>(false);
 
   const getGreeting = () => {
     const hr = new Date().getHours();
     if (hr < 12) return 'Chào buổi sáng ☀️';
     if (hr < 18) return 'Chào buổi chiều 🌤️';
     return 'Chào buổi tối 🌙';
+  };
+
+  const getWsUrl = () => {
+    const baseUrl = getApiBaseUrl(); // E.g., "http://192.168.1.242:5000/api"
+    const wsProto = baseUrl.startsWith('https') ? 'wss' : 'ws';
+    const domain = baseUrl.replace(/^https?:\/\//, '').replace(/\/api$/, '');
+    return `${wsProto}://${domain}`;
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // 1. Kiểm tra trạng thái thông báo chưa đọc ban đầu
+    const checkInitialNotifications = async () => {
+      const list = await notificationService.fetchNotifications(20);
+      const unreadCount = list.filter((n) => !n.is_read).length;
+      setHasUnread(unreadCount > 0);
+    };
+    checkInitialNotifications();
+
+    // 2. Kết nối WebSocket nhận thông báo thời gian thực
+    const wsUrl = `${getWsUrl()}/ws/notifications/${userId}`;
+    console.log(`[WebSocket] Kết nối thông báo: ${wsUrl}`);
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'NEW_NOTIFICATION') {
+          setHasUnread(true);
+          // Hiển thị thông báo nổi thân thiện
+          Alert.alert(
+            "Thông báo mới 🔔",
+            payload.data.message,
+            [
+              {
+                text: "Xem ngay",
+                onPress: () => {
+                  setHasUnread(false);
+                  router.push('/notification');
+                }
+              },
+              { text: "Đóng", style: "cancel" }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi phân tích WebSocket notification message:', error);
+      }
+    };
+
+    ws.onerror = (e) => {
+      console.log('[WebSocket] Lỗi kết nối thông báo:', e);
+    };
+
+    ws.onclose = () => {
+      console.log('[WebSocket] Đóng kết nối thông báo.');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [userId]);
+
+  const handleNotificationPress = () => {
+    setHasUnread(false);
+    router.push('/notification');
   };
 
   const isAvatarUrl = userAvatar.startsWith('http://') || userAvatar.startsWith('https://');
@@ -41,8 +112,9 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ userAvatar, fullName }) 
         </Text>
       </View>
 
-      <TouchableOpacity style={styles.notificationWrap}>
+      <TouchableOpacity style={styles.notificationWrap} onPress={handleNotificationPress}>
         <Ionicons name="notifications-outline" size={22} color="#333" />
+        {hasUnread && <View style={styles.unreadBadge} />}
       </TouchableOpacity>
     </View>
   );
@@ -96,5 +168,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-
+  unreadBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ff4757', // Coral Red
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
 });

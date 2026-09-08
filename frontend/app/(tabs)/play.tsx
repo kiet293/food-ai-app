@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import { fetchReels, toggleLikeReel } from '@/services/reel/reelService';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { fetchReels, toggleLikeReel, incrementReelView } from '@/services/reel/reelService';
 import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
@@ -24,6 +25,10 @@ import ReelVideoItem, { ReelItem } from '@/components/reels/ReelVideoItem';
 const { height } = Dimensions.get('window');
 
 export default function PlayScreen() {
+  const { reelId, openComments } = useLocalSearchParams<{ reelId?: string; openComments?: string }>();
+  const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   // Khởi tạo chiều cao
@@ -62,6 +67,43 @@ export default function PlayScreen() {
       shouldDuckAndroid: false,
     }).catch(err => console.log('Audio mode error:', err));
   }, []);
+
+  // Tự động tăng lượt xem khi lướt sang video khác
+  useEffect(() => {
+    if (!activeReelId) return;
+    const dbId = parseInt(activeReelId.replace('reel-', ''), 10);
+    if (!isNaN(dbId)) {
+      incrementReelView(dbId).then(data => {
+        if (data && typeof data.viewsCount === 'number') {
+          // Cập nhật lượt xem thực tế trên UI cục bộ
+          setReels(prev =>
+            prev.map(r => (r.id === activeReelId ? { ...r, viewsCount: data.viewsCount } : r))
+          );
+        }
+      }).catch(err => console.log('Error incrementing reel view:', err));
+    }
+  }, [activeReelId]);
+
+  // Tự động cuộn tới video được chỉ định từ Profile
+  useEffect(() => {
+    if (reelId && reels.length > 0) {
+      const idx = reels.findIndex(r => r.id === reelId || r.db_id?.toString() === reelId);
+      if (idx !== -1) {
+        setActiveReelId(reels[idx].id);
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ index: idx, animated: false });
+        }, 100);
+
+        if (openComments === 'true') {
+          setActiveReelForModal(reels[idx]);
+          setIsCommentModalOpen(true);
+        }
+
+        // Clear params to allow scrolling to the same video again next time
+        router.setParams({ reelId: undefined, openComments: undefined });
+      }
+    }
+  }, [reelId, reels, openComments]);
 
   // Hàm xử lý Thả tim/Bỏ thả tim đồng bộ Backend
   const toggleLike = async (reelId: string, dbId?: number) => {
@@ -146,6 +188,12 @@ export default function PlayScreen() {
     itemVisiblePercentThreshold: 70,
   }).current;
 
+  const getItemLayout = (data: any, index: number) => ({
+    length: reelHeight,
+    offset: reelHeight * index,
+    index,
+  });
+
   return (
     <View
       style={styles.container}
@@ -175,8 +223,10 @@ export default function PlayScreen() {
       ) : (
         /* Vertical Paging FlatList */
         <FlatList
+          ref={flatListRef}
           data={reels}
           keyExtractor={(item) => item.id}
+          getItemLayout={getItemLayout}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           decelerationRate="fast"

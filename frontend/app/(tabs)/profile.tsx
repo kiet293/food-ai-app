@@ -302,7 +302,7 @@ export default function ProfileScreen() {
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
             dynamicCardBg={dynamicCardBg}
-            onNavigateToPlay={() => router.push('/(tabs)/play')}
+            onNavigateToPlay={(reelId) => router.push({ pathname: '/(tabs)/play', params: { reelId } })}
           />
         </ScrollView>
       ) : null}

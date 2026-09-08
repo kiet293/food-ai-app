@@ -34,6 +34,7 @@ export interface Comment {
     timeAgo: string;
     likesCount: number;
     isLiked: boolean;
+    parentId?: string;
 }
 
 // Hàm format thời gian tương đối
@@ -51,7 +52,7 @@ const formatTimeAgo = (isoString: string): string => {
         if (diffMin < 60) return `${diffMin} phút trước`;
         if (diffHr < 24) return `${diffHr} giờ trước`;
         return `${diffDay} ngày trước`;
-    } catch (e) {
+    } catch {
         return 'Vài giờ trước';
     }
 };
@@ -68,6 +69,7 @@ export const fetchReelComments = async (dbId: number): Promise<Comment[]> => {
             authorName: c.user.name || c.user.username,
             authorAvatar: c.user.avatar || '🥗',
             text: c.content,
+            parentId: c.parent_comment_id ? c.parent_comment_id.toString() : undefined,
             timeAgo: c.created_at ? formatTimeAgo(c.created_at) : 'Vừa xong',
             likesCount: c.likesCount || 0,
             isLiked: c.isLiked || false,
@@ -79,9 +81,13 @@ export const fetchReelComments = async (dbId: number): Promise<Comment[]> => {
 };
 
 // 4. Hàm đăng bình luận mới (đã được xử lý/format dữ liệu sạch)
-export const createReelComment = async (dbId: number, content: string): Promise<Comment> => {
+export const createReelComment = async (dbId: number, content: string, parentCommentId?: number): Promise<Comment> => {
     try {
-        const resData = await apiClient.post(`${REELS_API_URL}/${dbId}/comments`, { content });
+        const body: any = { content };
+        if (parentCommentId !== undefined) {
+            body.parent_comment_id = parentCommentId;
+        }
+        const resData = await apiClient.post(`${REELS_API_URL}/${dbId}/comments`, body);
         const c = resData.data;
 
         // Trả về đối tượng Comment sạch cho UI Component tiêu thụ trực tiếp
@@ -90,6 +96,7 @@ export const createReelComment = async (dbId: number, content: string): Promise<
             authorName: c.user.name || c.user.username,
             authorAvatar: c.user.avatar || '🥗',
             text: c.content,
+            parentId: c.parent_comment_id ? c.parent_comment_id.toString() : undefined,
             timeAgo: c.created_at ? formatTimeAgo(c.created_at) : 'Vừa xong',
             likesCount: c.likesCount || 0,
             isLiked: c.isLiked || false,
@@ -144,6 +151,17 @@ export const toggleCommentLike = async (commentId: number) => {
         return resData.data; // Trả về { isLiked: boolean }
     } catch (error) {
         console.error("❌ Lỗi toggleCommentLike:", error);
+        throw error;
+    }
+};
+
+// 7. Hàm tăng lượt xem video
+export const incrementReelView = async (dbId: number) => {
+    try {
+        const resData = await apiClient.post(`${REELS_API_URL}/${dbId}/view`);
+        return resData.data; // Trả về { viewsCount: number }
+    } catch (error) {
+        console.error("❌ Lỗi tăng lượt xem video:", error);
         throw error;
     }
 };

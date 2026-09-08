@@ -43,3 +43,24 @@ deactivate
 lệnh chạy server:
 # Quan trọng: Phải chạy với host 0.0.0.0 để cho phép kết nối từ bên ngoài
 uvicorn app.main:app --reload --host 0.0.0.0 --port 5000
+
+## Cấu trúc backend
+
+Kiến trúc và quy tắc phụ thuộc được mô tả trong [ARCHITECTURE.md](ARCHITECTURE.md).
+`app/main.py` chỉ là ASGI entry point; cấu hình ứng dụng nằm trong
+`app/application.py`, router được đăng ký tại `app/api/router.py`, và các dịch
+vụ bên ngoài nằm trong `app/integrations/`.
+
+## Chạy test
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+## Migration
+
+Migration mới được đặt tại `migrations/` và chạy bằng Flyway:
+
+```powershell
+docker compose --profile tools run --rm flyway
+```

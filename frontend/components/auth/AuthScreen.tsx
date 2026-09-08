@@ -95,7 +95,7 @@ export default function AuthScreen({ onLoginSuccess }: { onLoginSuccess: () => v
                 >
                     <Text style={styles.switchButtonText}>
                         {isLoginMode
-                            ? 'Chưa có tài khoản? Nhấn vào đây để Đăng ký'
+                            ? 'Chưa có tài khoản? Đăng ký tại đây'
                             : 'Đã có tài khoản? Quay lại Đăng nhập'}
                     </Text>
                 </TouchableOpacity>

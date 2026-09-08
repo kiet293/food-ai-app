@@ -37,9 +37,14 @@ export const apiClient = {
   post(endpoint: string, body?: any, options?: RequestInit) {
     const isFormData = body instanceof FormData;
     const isString = typeof body === 'string';
+    const headers = { ...options?.headers } as any;
+    if (body && !isFormData && !isString && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
     return this.request(endpoint, {
       ...options,
       method: 'POST',
+      headers,
       body: isFormData || isString ? body : (body ? JSON.stringify(body) : undefined),
     });
   },
@@ -47,9 +52,14 @@ export const apiClient = {
   put(endpoint: string, body?: any, options?: RequestInit) {
     const isFormData = body instanceof FormData;
     const isString = typeof body === 'string';
+    const headers = { ...options?.headers } as any;
+    if (body && !isFormData && !isString && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
     return this.request(endpoint, {
       ...options,
       method: 'PUT',
+      headers,
       body: isFormData || isString ? body : (body ? JSON.stringify(body) : undefined),
     });
   },
