@@ -15,7 +15,7 @@ import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchReels, toggleLikeReel, incrementReelView } from '@/services/reel/reelService';
+import { fetchReels, fetchReelById, toggleLikeReel, incrementReelView } from '@/services/reel/reelService';
 import { followUser, unfollowUser } from '@/services/community/communityService';
 import { CommentModal } from '@/components/community/CommentModal';
 import { SharePostModal } from '@/components/community/SharePostModal';
@@ -36,9 +36,12 @@ export default function PlayScreen() {
 
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingPageRef = useRef(false);
+  const generationRef = useRef(0);
   const [isMuted, setIsMuted] = useState(false);
   const [activeReelId, setActiveReelId] = useState<string>('');
-  const [isCurrentVideoPlaying, setIsCurrentVideoPlaying] = useState(true);
 
   // Quản lý trạng thái mở/đóng các Modal tương tác
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
@@ -48,13 +51,40 @@ export default function PlayScreen() {
 
   // Hàm gọi API để lấy danh sách video Reels mới nhất từ database PostgreSQL
   const loadReels = async () => {
+    const generation = ++generationRef.current;
+    loadingPageRef.current = true;
     setIsLoading(true);
     const data = await fetchReels();
+    if (generation !== generationRef.current) return;
+    pageRef.current = 1;
+    hasMoreRef.current = data.length === 20;
+    loadingPageRef.current = false;
     setReels(data);
     if (data.length > 0) {
       setActiveReelId(data[0].id); // Mặc định chạy video đầu tiên trong danh sách
     }
     setIsLoading(false);
+  };
+
+  const loadMoreReels = async () => {
+    if (loadingPageRef.current || !hasMoreRef.current) return;
+    loadingPageRef.current = true;
+    const generation = generationRef.current;
+    const page = pageRef.current + 1;
+    try {
+      const data: ReelItem[] = await fetchReels(page, 20, true);
+      if (generation !== generationRef.current) return;
+      setReels(previous => {
+        const ids = new Set(previous.map(item => item.id));
+        return [...previous, ...data.filter(item => !ids.has(item.id))];
+      });
+      pageRef.current = page;
+      hasMoreRef.current = data.length === 20;
+    } catch (error) {
+      console.error('Không thể tải thêm video:', error);
+    } finally {
+      if (generation === generationRef.current) loadingPageRef.current = false;
+    }
   };
 
   // Gọi loadReels khi màn hình được khởi tạo (Mount)
@@ -86,6 +116,17 @@ export default function PlayScreen() {
 
   // Tự động cuộn tới video được chỉ định từ Profile
   useEffect(() => {
+    if (!reelId || isLoading || reels.some(item => item.id === reelId || item.db_id?.toString() === reelId)) return;
+    const id = Number(reelId.replace('reel-', ''));
+    if (!Number.isInteger(id)) return;
+    let active = true;
+    fetchReelById(id).then(item => {
+      if (active && item) setReels(previous => previous.some(existing => existing.id === item.id) ? previous : [item, ...previous]);
+    }).catch(error => console.error('Không thể tải video:', error));
+    return () => { active = false; };
+  }, [reelId, isLoading, reels]);
+
+  useEffect(() => {
     if (reelId && reels.length > 0) {
       const idx = reels.findIndex(r => r.id === reelId || r.db_id?.toString() === reelId);
       if (idx !== -1) {
@@ -103,7 +144,7 @@ export default function PlayScreen() {
         router.setParams({ reelId: undefined, openComments: undefined });
       }
     }
-  }, [reelId, reels, openComments]);
+  }, [reelId, reels, openComments, router]);
 
   // Hàm xử lý Thả tim/Bỏ thả tim đồng bộ Backend
   const toggleLike = async (reelId: string, dbId?: number) => {
@@ -137,7 +178,7 @@ export default function PlayScreen() {
     const targetReel = reels.find((r) => r.id === reelId);
     if (!targetReel) return;
 
-    const targetUserId = parseInt(targetReel.author.id.replace('user-', ''), 10);
+    const targetUserId = parseInt(String(targetReel.author.id).replace(/^user-/, ''), 10);
     if (isNaN(targetUserId)) return;
 
     // 1. Optimistic Update (Cập nhật giao diện lập tức)
@@ -225,6 +266,8 @@ export default function PlayScreen() {
         <FlatList
           ref={flatListRef}
           data={reels}
+          onEndReached={loadMoreReels}
+          onEndReachedThreshold={0.5}
           keyExtractor={(item) => item.id}
           getItemLayout={getItemLayout}
           pagingEnabled
@@ -251,7 +294,6 @@ export default function PlayScreen() {
                 setActiveReelForModal(r);
                 setIsShareModalOpen(true);
               }}
-              onPlayStateChange={(isPlaying) => setIsCurrentVideoPlaying(isPlaying)}
             />
           )}
         />

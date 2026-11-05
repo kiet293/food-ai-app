@@ -1,25 +1,19 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, SafeAreaView, StatusBar, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserProfile } from '@/services/auth/authService';
 import useRecentSearches from '@/hooks/useRecentSearches';
-import {
-  MOCK_TRENDING_RECIPES,
-  MOCK_HOT_TAGS,
-  MOCK_EXPLORE_GRID,
-} from '@/services/mock/mockCommunityData';
-import { fetchPopularChefs, ChefInfo } from '@/services/user/userService';
-import { fetchTrendingRecipes, TrendingRecipeItem, fetchFollowingFeed } from '@/services/recipe/recipeService';
-import { fetchHotTags, TagInfo } from '@/services/tag/tagService';
+import { useExploreData } from '@/hooks/useExploreData';
+import { fetchFollowingFeed } from '@/services/recipe/recipeService';
+import { MOCK_HOT_TAGS } from '@/services/mock/mockCommunityData';
 
 // Modular Refactored Components
 import { HomeHeader } from '@/components/explore/HomeHeader';
 import { ExploreSearchBar } from '@/components/explore/ExploreSearchBar';
 import { SubTabBar } from '@/components/explore/SubTabBar';
 import { AiMealSuggestionBanner } from '@/components/explore/AiMealSuggestionBanner';
-import { PopularIngredientsSection, IngredientCard } from '@/components/explore/PopularIngredientsSection';
-import { TopCollectionsSection } from '@/components/explore/TopCollectionsSection';
+import { IngredientCard } from '@/components/explore/PopularIngredientsSection';
 import { PopularChefsSection } from '@/components/explore/PopularChefsSection';
 import { TrendingRecipesSection } from '@/components/explore/TrendingRecipesSection';
 import { HotTagsSection } from '@/components/explore/HotTagsSection';
@@ -85,27 +79,7 @@ export default function HomeScreen() {
 
   const { items: recentItems, remove: removeRecent } = useRecentSearches();
 
-  const [chefs, setChefs] = useState<ChefInfo[]>([]);
-  const [trendingRecipes, setTrendingRecipes] = useState<TrendingRecipeItem[]>([]);
-  const [hotTags, setHotTags] = useState<TagInfo[]>([]);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      const tags = await fetchHotTags();
-      if (tags) setHotTags(tags);
-    };
-    const loadChefs = async () => {
-      const popularChefs = await fetchPopularChefs();
-      if (popularChefs.length > 0) setChefs(popularChefs);
-    };
-    const loadTrending = async () => {
-      const trending = await fetchTrendingRecipes();
-      if (trending.length > 0) setTrendingRecipes(trending);
-    };
-    loadTags();
-    loadChefs();
-    loadTrending();
-  }, []);
+  const { chefs, setChefs, trendingRecipes, setTrendingRecipes, hotTags, refreshExplore } = useExploreData();
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -114,14 +88,15 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setRefreshTrigger(prev => prev + 1);
-    // Fake loading delay for other mock sections
-    setTimeout(() => {
+    try {
+      await refreshExplore();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshExplore]);
 
   useFocusEffect(
     useCallback(() => {

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship  # type: ignore
-from app.db import Base
+from app.db.base import Base
 
 class CollectionRecipeDB(Base):
     __tablename__ = "collection_recipes"

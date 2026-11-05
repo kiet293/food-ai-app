@@ -13,10 +13,10 @@ from app.modules.users.model import UserDB
 
 class NotificationService:
     @staticmethod
-    def generate_message(n: NotificationDB, db: Session) -> str:
+    def generate_message(n: NotificationDB, db: Session, actors=None) -> str:
         actor_name = "Một người dùng"
         if n.actor_id:
-            actor = db.query(UserDB).filter(UserDB.id == n.actor_id).first()
+            actor = actors.get(n.actor_id) if actors is not None else db.query(UserDB).filter(UserDB.id == n.actor_id).first()
             if actor:
                 actor_name = actor.full_name or actor.username
 
@@ -132,13 +132,14 @@ class NotificationService:
                 NotificationDB.user_id == user_id
             ).order_by(NotificationDB.created_at.desc()).limit(limit).all()
 
+            actors = {u.id: u for u in db.query(UserDB).filter(UserDB.id.in_({n.actor_id for n in notifications if n.actor_id})).all()}
             result = []
             for n in notifications:
-                message = NotificationService.generate_message(n, db)
+                message = NotificationService.generate_message(n, db, actors)
                 
                 actor_data = None
                 if n.actor_id:
-                    actor = db.query(UserDB).filter(UserDB.id == n.actor_id).first()
+                    actor = actors.get(n.actor_id)
                     if actor:
                         actor_data = {
                             "id": actor.id,

@@ -1,3 +1,4 @@
+from app.modules.recipes.services.write_service import RecipeWriteService
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
@@ -8,6 +9,7 @@ from app.core.responses import success_response
 from app.db import get_db
 from app.modules.recipes.schemas import AIAnalysisResult
 from app.modules.recipes.services.catalog_service import RecipeCatalogService
+from app.modules.recipes.services.stats_service import RecipeStatsService
 from app.modules.users.model import UserDB
 
 
@@ -16,7 +18,7 @@ router = APIRouter(tags=["Recipes - Sổ tay & Xu hướng"])
 
 @router.get("/trending")
 def get_trending_recipes(
-    limit: int = 10,
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: Optional[UserDB] = Depends(get_optional_current_user),
 ):
@@ -44,7 +46,7 @@ def get_notebook_recipes(
 
 @router.get("/popular")
 def get_popular_recipes(db: Session = Depends(get_db)):
-    return RecipeCatalogService.get_popular_recipes(db)
+    return RecipeStatsService.get_popular_recipes(db)
 
 
 @router.post("")
@@ -63,7 +65,7 @@ def create_recipe(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user),
 ):
-    data = RecipeCatalogService.create_new_recipe(
+    data = RecipeWriteService.create_new_recipe(
         db, current_user, recipe_name, description, ingredients, instructions,
         cook_time_minutes, servings, difficulty, category_name, tags, image,
     )
@@ -156,7 +158,7 @@ def update_recipe(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user),
 ):
-    data = RecipeCatalogService.update_recipe(
+    data = RecipeWriteService.update_recipe(
         db, recipe_id, current_user, recipe_name, description, ingredients,
         instructions, cook_time_minutes, servings, difficulty, category_name,
         tags, image,

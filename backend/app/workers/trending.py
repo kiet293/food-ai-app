@@ -13,6 +13,9 @@ def calculate_trending_scores() -> None:
     """Recalculate scores in a short-lived, worker-owned transaction."""
     db = SessionLocal()
     try:
+        # Prevent overlapping updates even if multiple scheduler processes start.
+        if not db.execute(text("SELECT pg_try_advisory_xact_lock(194721031)")).scalar():
+            return
         db.execute(
             text(
                 """

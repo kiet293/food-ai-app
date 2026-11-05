@@ -26,6 +26,11 @@ class Settings:
     cloudinary_api_secret: str | None
     gemini_api_key: str | None
     pexels_api_key: str | None
+    yolo_model_path: str = ""
+    auto_create_schema: bool = False
+    run_scheduler: bool = False
+    trending_interval_seconds: int = 3600
+    sync_pexels_on_read: bool = False
 
     @property
     def is_production(self) -> bool:
@@ -52,4 +57,9 @@ def get_settings() -> Settings:
         cloudinary_api_secret=os.getenv("CLOUDINARY_API_SECRET"),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         pexels_api_key=os.getenv("PEXELS_API_KEY"),
+        yolo_model_path=os.getenv("YOLO_MODEL_PATH", ""),
+        auto_create_schema=os.getenv("AUTO_CREATE_SCHEMA", "false").lower() == "true",
+        run_scheduler=os.getenv("RUN_SCHEDULER", "false").lower() == "true",
+        trending_interval_seconds=max(60, int(os.getenv("TRENDING_INTERVAL_SECONDS", "3600"))),
+        sync_pexels_on_read=os.getenv("SYNC_PEXELS_ON_READ", "false").lower() == "true",
     )

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.exceptions import CustomException
@@ -33,6 +34,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
+            headers=exc.headers,
             content={
                 "status": "error",
                 "message": str(exc.detail),
@@ -58,7 +60,7 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "status": "error",
                 "message": "Dữ liệu đầu vào không hợp lệ",
                 "code": "VALIDATION_ERROR",
-                "data": errors,
+                "data": jsonable_encoder(errors, custom_encoder={ValueError: str}),
                 "timestamp": _timestamp(),
             },
         )

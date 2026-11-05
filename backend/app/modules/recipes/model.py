@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship, backref  # type: ignore
 from sqlalchemy import UniqueConstraint
-from app.db import Base
+from app.db.base import Base
 
 class RecipeDB(Base):
     __tablename__ = "recipes"

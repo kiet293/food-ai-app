@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship  # type: ignore
-from app.db import Base
+from app.db.base import Base
 
 class NotificationDB(Base):
     __tablename__ = "notifications"

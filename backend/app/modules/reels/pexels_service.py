@@ -21,10 +21,8 @@ class PexelsService:
 
         print("[PEXELS] Dang pull them video tu Pexels vi database dang co it video...")
         try:
-            # Bo qua xac thuc SSL (tranh loi tren mot so may Windows)
+            # Use the platform trust store when contacting the provider.
             ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
 
             url = "https://api.pexels.com/videos/search?query=cooking&per_page=12&orientation=portrait"
             req = urllib.request.Request(

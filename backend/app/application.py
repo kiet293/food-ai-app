@@ -19,17 +19,25 @@ from app.workers import trending_scheduler_task
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Kept temporarily for compatibility until migrations are unified.
-    Base.metadata.create_all(bind=engine)
+    settings = get_settings()
+    if settings.auto_create_schema:
+        if settings.is_production:
+            raise RuntimeError("AUTO_CREATE_SCHEMA must be disabled in production")
+        Base.metadata.create_all(bind=engine)
     configure_cloudinary()
-    trending_task = asyncio.create_task(trending_scheduler_task())
+    trending_task = (
+        asyncio.create_task(trending_scheduler_task(settings.trending_interval_seconds))
+        if settings.run_scheduler else None
+    )
     app.state.trending_task = trending_task
     try:
         yield
     finally:
-        trending_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await trending_task
+        if trending_task is not None:
+            trending_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await trending_task
+        engine.dispose()
 
 
 def create_app() -> FastAPI:

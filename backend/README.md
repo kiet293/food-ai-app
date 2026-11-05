@@ -32,9 +32,24 @@ pip install -r requirements.txt
 ```
 
 ## 4) Chay server
+
+Copy `.env.example` to `.env` and set the database credentials and API keys.
+Initialize or upgrade the database before starting the server:
+
+```bash
+docker compose up -d db
+docker compose --profile tools run --rm flyway
+```
+
 ```bash
 uvicorn app.main:app --reload
 ```
+
+Run scheduled trending updates in a second terminal with `python -m app.workers`,
+or start the container stack with `docker compose --profile workers up -d api scheduler`.
+The API no longer creates tables or starts the scheduler by default.
+To import Pexels videos explicitly, set `PEXELS_API_KEY` and run
+`python -m app.workers sync-pexels`.
 
 ## 5) Tat virtual environment
 ```bash

@@ -3,12 +3,18 @@ import { apiClient } from '../shared/apiClient';
 
 const REELS_API_URL = `${getApiBaseUrl()}/reels`;
 
+export const fetchReelById = async (id: number) => {
+    const response = await apiClient.get(`${REELS_API_URL}/${id}`);
+    return response.data;
+};
+
 // 1. Hàm lấy danh sách Reels
-export const fetchReels = async () => {
+export const fetchReels = async (page: number = 1, limit: number = 20, strict: boolean = false) => {
     try {
-        const resData = await apiClient.get(REELS_API_URL);
+        const resData = await apiClient.get(`${REELS_API_URL}?page=${page}&limit=${limit}`);
         return resData.data || [];
     } catch (error) {
+        if (strict) throw error;
         console.error("❌ Lỗi tải Reels từ API:", error);
         return [];
     }

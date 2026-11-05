@@ -1,6 +1,6 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, StatusBar, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { fetchUserProfile, UserProfileInfo } from '../../services/user/userService';
 import { followUser, unfollowUser } from '../../services/community/communityService';
@@ -49,7 +49,8 @@ export default function UserProfileScreen() {
   const handleToggleFollow = async () => {
     if (!id || followLoading || !profile) return;
 
-    const userId = parseInt(id as string, 10);
+    const rawId = String(id).replace(/^user-/, '');
+    const userId = parseInt(rawId, 10);
     if (isNaN(userId)) return;
 
     const previousFollowing = isFollowing;
@@ -133,8 +134,8 @@ export default function UserProfileScreen() {
           dynamicTextColor={dynamicTextColor}
           dynamicSubTextColor={dynamicSubTextColor}
           dynamicBorderColor={dynamicBorderColor}
-          onPressFollowing={() => router.push(`/user/${id}/followers?tab=following`)}
-          onPressFollowers={() => router.push(`/user/${id}/followers?tab=followers`)}
+          onPressFollowing={() => router.push(`/user/${String(id).replace(/^user-/, '')}/followers?tab=following`)}
+          onPressFollowers={() => router.push(`/user/${String(id).replace(/^user-/, '')}/followers?tab=followers`)}
         />
 
         {/* Action Buttons */}

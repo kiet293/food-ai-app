@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text  # type: ignore
 from sqlalchemy.sql import func  # type: ignore
 from sqlalchemy.orm import relationship, backref  # type: ignore
-from app.db import Base
+from app.db.base import Base
 
 class ReelDB(Base):
     __tablename__ = "reels"

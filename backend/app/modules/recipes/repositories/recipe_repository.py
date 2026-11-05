@@ -1,6 +1,6 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.modules.recipes.model import RecipeDB
+from app.modules.recipes.model import RecipeDB, CommentDB
 
 
 class RecipeRepository:
@@ -8,7 +8,9 @@ class RecipeRepository:
 
     @staticmethod
     def get_by_id(db: Session, recipe_id: int) -> RecipeDB | None:
-        return db.query(RecipeDB).filter(RecipeDB.id == recipe_id).first()
+        return db.query(RecipeDB).options(
+            selectinload(RecipeDB.comments).joinedload(CommentDB.user),
+        ).filter(RecipeDB.id == recipe_id).first()
 
     @staticmethod
     def add(db: Session, recipe: RecipeDB) -> RecipeDB:

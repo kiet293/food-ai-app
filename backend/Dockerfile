@@ -18,4 +18,4 @@ COPY . .
 EXPOSE 8000
 
 # 6. Lệnh khởi chạy server (Có cờ --reload để hỗ trợ dev)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

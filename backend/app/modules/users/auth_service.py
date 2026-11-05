@@ -18,12 +18,14 @@ class AuthService:
         # Mã hóa mật khẩu và lưu vào DB
         hashed_password = get_password_hash(user.password)
         new_user = UserDB(username=user.username, hashed_password=hashed_password)
-        UserRepository.add(db, new_user)
-        db.commit()
-        db.refresh(new_user)
-
-        # Đăng ký xong thì cấp luôn Token để vào app (không cần đăng nhập lại)
-        access_token = create_access_token(data={"sub": str(new_user.id)})
+        try:
+            UserRepository.add(db, new_user)
+            db.flush()
+            access_token = create_access_token(data={"sub": str(new_user.id)})
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         return {"access_token": access_token, "token_type": "bearer"}
 
     @staticmethod

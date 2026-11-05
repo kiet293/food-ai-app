@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Body, UploadFile, File, Form, BackgroundTasks  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from typing import Optional
+from fastapi import Query
 
 from app.api.dependencies import get_current_user, get_optional_current_user
 from app.core.responses import success_response
@@ -11,13 +12,28 @@ from app.modules.users.model import UserDB
 
 router = APIRouter(tags=["Reels Management"])
 
+
+@router.get("/{reel_id}")
+def get_reel(
+    reel_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_current_user),
+):
+    from fastapi import HTTPException
+    items = ReelService.get_reels_list(db, current_user, reel_id=reel_id)
+    if not items:
+        raise HTTPException(status_code=404, detail="Không tìm thấy video")
+    return success_response(data=items[0])
+
 # 1. API LẤY DANH SÁCH CLIPS (GET /api/reels)
 @router.get("")
 def get_reels(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: Optional[UserDB] = Depends(get_optional_current_user)
 ):
-    data = ReelService.get_reels_list(db, current_user)
+    data = ReelService.get_reels_list(db, current_user, page, limit)
     return success_response(
         data=data,
         message="Tải danh sách video Reels thành công!"
