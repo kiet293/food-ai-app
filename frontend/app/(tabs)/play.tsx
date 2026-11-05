@@ -11,7 +11,6 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -90,12 +89,6 @@ export default function PlayScreen() {
   // Gọi loadReels khi màn hình được khởi tạo (Mount)
   useEffect(() => {
     loadReels();
-
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      shouldDuckAndroid: false,
-    }).catch(err => console.log('Audio mode error:', err));
   }, []);
 
   // Tự động tăng lượt xem khi lướt sang video khác

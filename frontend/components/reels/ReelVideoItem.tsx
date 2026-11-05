@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import ReelRightActionBar from './ReelRightActionBar';
 import ReelBottomInfo from './ReelBottomInfo';
 
@@ -70,37 +70,39 @@ export default function ReelVideoItem({
   onOpenShare,
   onPlayStateChange,
 }: ReelVideoItemProps) {
-  const videoRef = useRef<Video>(null);
-  const [status, setStatus] = useState<any>({});
   const [isPlaying, setIsPlaying] = useState(true);
 
-  // Hook useEffect tự động điều khiển phát/dừng video dựa trên trạng thái isActive (đang xem)
+  const player = useVideoPlayer(item.videoUrl || '', (p) => {
+    p.loop = true;
+    p.muted = isMuted;
+  });
+
+  // Tự động điều khiển phát/dừng video dựa trên trạng thái isActive (đang xem)
   useEffect(() => {
-    if (videoRef.current) {
-      if (isActive) {
-        videoRef.current.playAsync(); // Tự động phát khi trượt đến video này
-        setIsPlaying(true);
-        if (onPlayStateChange) onPlayStateChange(true);
-      } else {
-        videoRef.current.stopAsync(); // Tự động dừng khi trượt qua video khác
-        setIsPlaying(false);
-      }
+    if (isActive && isPlaying) {
+      player.play();
+      if (onPlayStateChange) onPlayStateChange(true);
+    } else {
+      player.pause();
     }
-  }, [isActive]);
+  }, [isActive, isPlaying, player]);
+
+  // Đồng bộ trạng thái mute
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
 
   // Tạm dừng hoặc Phát tiếp
   const handlePlayPause = () => {
-    if (videoRef.current) {
-      const nextState = !isPlaying;
-      if (isPlaying) {
-        videoRef.current.pauseAsync();
-      } else {
-        videoRef.current.playAsync();
-      }
-      setIsPlaying(nextState);
-      if (onPlayStateChange) {
-        onPlayStateChange(nextState);
-      }
+    const nextState = !isPlaying;
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+    setIsPlaying(nextState);
+    if (onPlayStateChange) {
+      onPlayStateChange(nextState);
     }
   };
 
@@ -109,28 +111,17 @@ export default function ReelVideoItem({
       {/* Trình phát Video nền hoặc hiển thị ảnh bìa nếu link lỗi */}
       {item.videoUrl ? (
         <Pressable style={StyleSheet.absoluteFill} onPress={handlePlayPause}>
-          <Video
-            ref={videoRef}
+          <VideoView
+            player={player}
             style={styles.backgroundMedia}
-            source={{ uri: item.videoUrl }}
-            resizeMode={ResizeMode.COVER}
-            isLooping
-            isMuted={isMuted}
-            shouldPlay={isActive && isPlaying}
-            onPlaybackStatusUpdate={(s) => setStatus(() => s)}
-            onError={(error) => console.log('Video Playback Error:', error)}
+            contentFit="cover"
+            nativeControls={false}
           />
         </Pressable>
       ) : (
         <Image source={{ uri: item.posterUrl }} style={styles.backgroundMedia} />
       )}
       <View style={styles.gradientOverlay} pointerEvents="none" />
-
-      {status.isBuffering && (
-        <View style={styles.centerPlayIcon}>
-          <ActivityIndicator size="large" color="#fff" />
-        </View>
-      )}
 
       {/* Biểu tượng nút Play hiển thị nếu video đang bị tạm dừng */}
       {!isPlaying && (
