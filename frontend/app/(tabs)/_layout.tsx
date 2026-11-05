@@ -59,11 +59,11 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Khám Phá',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: any) => (
             <Ionicons
               size={24}
               name={focused ? 'compass' : 'compass-outline'}
-              color={color}
+              color={color ?? '#28a745'}
             />
           ),
         }}
@@ -72,11 +72,11 @@ export default function TabLayout() {
         name="play"
         options={{
           title: 'Reels',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: any) => (
             <Ionicons
               size={24}
               name={focused ? 'play-circle' : 'play-circle-outline'}
-              color={color}
+              color={color ?? '#28a745'}
             />
           ),
         }}
@@ -86,11 +86,11 @@ export default function TabLayout() {
         options={{
           title: 'Sổ tay',
           headerTitle: 'Sổ tay ẩm thực',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: any) => (
             <Ionicons
               size={24}
               name={focused ? 'book' : 'book-outline'}
-              color={color}
+              color={color ?? '#28a745'}
             />
           ),
         }}
@@ -100,11 +100,11 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Tài khoản',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: any) => (
             <Ionicons
               size={24}
               name={focused ? 'person' : 'person-outline'}
-              color={color}
+              color={color ?? '#28a745'}
             />
           ),
         }}

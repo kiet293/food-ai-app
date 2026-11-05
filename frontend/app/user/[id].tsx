@@ -107,7 +107,7 @@ export default function UserProfileScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicBg }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="dark-content" backgroundColor={dynamicBg} />
+      <StatusBar barStyle="dark-content" />
 
       <ProfileHeader
         fullName={profile.name}

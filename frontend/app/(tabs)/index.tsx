@@ -138,7 +138,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Header Cá Nhân */}
       <HomeHeader userAvatar={userAvatar} fullName={userInfo?.full_name || 'Đầu Bếp Tại Gia'} userId={userInfo?.id} />

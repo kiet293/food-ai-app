@@ -81,7 +81,7 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number, selectedTag
         columnWrapperStyle={styles.columnWrapper}
         scrollEnabled={false} // Tạm thời disable scroll của FlatList để cuộn cùng ScrollView cha (index.tsx)
         ListFooterComponent={
-          isLoading ? <ActivityIndicator size="small" color="#2ecc71" style={{ margin: 20 }} /> : null
+          isLoading ? <ActivityIndicator size="small" color="#2ecc71" style={{ margin: 20 }} /> : undefined
         }
       />
     </View>

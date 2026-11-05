@@ -54,7 +54,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const hasInitialized = useRef(false);
 
   useEffect(() => {

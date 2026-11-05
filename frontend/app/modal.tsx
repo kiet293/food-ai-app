@@ -46,7 +46,7 @@ export default function ModalScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f6f3ea" />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.container}>
         {/* Header */}

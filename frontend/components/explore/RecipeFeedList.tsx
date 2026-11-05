@@ -400,11 +400,11 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
         onEndReached={() => loadData(true)}
         onEndReachedThreshold={0.5}
         contentContainerStyle={styles.feedScroll}
-        ListHeaderComponent={ListHeaderComponent}
+        ListHeaderComponent={ListHeaderComponent ?? undefined}
         ListFooterComponent={
           isLoading && !isFirstLoad ? (
             <ActivityIndicator size="small" color="#28a745" style={{ margin: 20 }} />
-          ) : null
+          ) : undefined
         }
       />
 

@@ -296,7 +296,7 @@ export default function RecipeDetailScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" />
 
       <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ flex: 1 }}>
         {/* HERO SECTION */}

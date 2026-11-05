@@ -245,7 +245,7 @@ export default function PlayScreen() {
         }
       }}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header Overlay */}
       <View style={[styles.headerOverlay, { top: insets.top + 8 }]}>

@@ -96,7 +96,7 @@ export const CommentModal: React.FC<CommentModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<any>(null);
 
   const threads = useMemo(() => buildCommentThreads(comments), [comments]);
   const authorById = useMemo(
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.22)',
   },
   sheet: {
