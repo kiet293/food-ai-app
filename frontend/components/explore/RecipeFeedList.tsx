@@ -430,7 +430,7 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc', // slate-50 light background
+    backgroundColor: '#f5f6fa',
   },
   centerLoading: {
     flex: 1,
@@ -441,16 +441,19 @@ const styles = StyleSheet.create({
   feedScroll: {
     paddingBottom: 40,
   },
+  // ─── CARD CONTAINER ────────────────────────────────────────────
   cardContainer: {
     backgroundColor: '#fff',
     marginBottom: 0,
   },
+  // ─── AUTHOR HEADER ────────────────────────────────────────────
   authorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   authorInfoLeft: {
     flexDirection: 'row',
@@ -458,18 +461,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatarImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: '#f1f5f9',
+    borderWidth: 2,
+    borderColor: '#e8f5e9',
   },
   avatarPlaceholder: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#fe2c55',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#28a745',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -485,16 +488,16 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a', // slate-900
+    color: '#1a2e1a',
     marginBottom: 1,
   },
   authorHandle: {
     fontSize: 12,
-    color: '#64748b', // slate-500
+    color: '#78909c',
   },
   followButton: {
-    backgroundColor: '#fe2c55',
-    paddingHorizontal: 14,
+    backgroundColor: '#28a745',
+    paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
     justifyContent: 'center',
@@ -508,24 +511,25 @@ const styles = StyleSheet.create({
   followingButton: {
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#d1d5db',
   },
   followingButtonText: {
-    color: '#475569',
+    color: '#6b7280',
   },
+  // ─── IMAGE CARD ───────────────────────────────────────────────
   imageCard: {
-    width: width - 32,
-    height: width - 32,
-    borderRadius: 24,
+    width: width - 24,
+    height: (width - 24) * 0.72,
+    borderRadius: 20,
     alignSelf: 'center',
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#e8f5e9',
     position: 'relative',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   recipeImage: {
     width: '100%',
@@ -537,59 +541,65 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
-    backgroundColor: 'rgba(0,0,0,0.02)', // keep it clean
+    height: 70,
+    backgroundColor: 'rgba(0,0,0,0.12)',
   },
+  // ─── DETAILS SECTION ─────────────────────────────────────────
   detailsSection: {
     paddingHorizontal: 16,
-    marginTop: 14,
+    marginTop: 12,
   },
   recipeTitle: {
-    color: '#0f172a',
-    fontSize: 18,
+    color: '#1a2e1a',
+    fontSize: 17,
     fontWeight: '800',
     lineHeight: 24,
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fffbeb', // amber-50
-    paddingHorizontal: 8,
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#fef3c7',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#fde68a',
   },
   ratingBadgeText: {
-    color: '#d97706', // amber-600
+    color: '#b45309',
     fontSize: 12,
     fontWeight: '700',
     marginLeft: 4,
   },
   descriptionContainer: {
-    marginTop: 10,
+    marginTop: 8,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#475569', // slate-600
+    color: '#546e7a',
     lineHeight: 20,
   },
   hashtag: {
-    color: '#0284c7', // sky-600
+    color: '#28a745',
     fontWeight: '700',
   },
+  // ─── ACTION BAR ───────────────────────────────────────────────
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    marginTop: 4,
   },
   actionBarLeft: {
     flexDirection: 'row',
@@ -601,19 +611,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionBtnLabel: {
-    fontSize: 14,
-    color: '#334155', // slate-700
+    fontSize: 13,
+    color: '#455a64',
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 5,
   },
   likedLabel: {
-    color: '#fe2c55',
+    color: '#e53935',
   },
   bookmarkBtn: {
     padding: 2,
   },
+  // ─── SEPARATOR ────────────────────────────────────────────────
   cardSeparator: {
-    height: 12,
-    backgroundColor: '#f1f5f9', // slate-100
+    height: 10,
+    backgroundColor: '#f0f4f8',
   },
 });
