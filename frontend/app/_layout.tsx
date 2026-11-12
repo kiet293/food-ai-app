@@ -3,7 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -80,15 +80,37 @@ export default function RootLayout() {
         signOut: () => setIsAuthenticated(false),
       }}>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-            <Stack.Screen name="search" options={{ headerShown: false }} />
-          </Stack>
-          <StatusBar style="auto" />
+          <View style={styles.webWrapper}>
+            <View style={styles.webContainer}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="search" options={{ headerShown: false }} />
+              </Stack>
+              <StatusBar style="auto" />
+            </View>
+          </View>
         </ThemeProvider>
       </AuthContext.Provider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  webWrapper: {
+    flex: 1,
+    backgroundColor: '#0f172a', // Nền tối bên ngoài máy tính tạo độ tương phản cao cấp
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 480 : undefined, // Khung kích thước điện thoại chuẩn khi mở trên web máy tính
+    shadowColor: Platform.OS === 'web' ? '#000' : 'transparent',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: Platform.OS === 'web' ? 0.25 : 0,
+    shadowRadius: 24,
+  },
+});
