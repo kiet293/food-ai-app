@@ -97,20 +97,29 @@ export default function RootLayout() {
   );
 }
 
+const IS_WEB = Platform.OS === 'web';
+
 const styles = StyleSheet.create({
   webWrapper: {
     flex: 1,
-    backgroundColor: '#0f172a', // Nền tối bên ngoài máy tính tạo độ tương phản cao cấp
-    alignItems: 'center',
-    justifyContent: 'center',
+    // Nền gradient xanh lá nhạt cho web — hài hòa với màu chủ đạo của app
+    backgroundColor: IS_WEB ? '#e8f5e9' : '#fff',
+    alignItems: IS_WEB ? 'center' : 'stretch',
+    justifyContent: IS_WEB ? 'center' : 'flex-start',
   },
   webContainer: {
     flex: 1,
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 480 : undefined, // Khung kích thước điện thoại chuẩn khi mở trên web máy tính
-    shadowColor: Platform.OS === 'web' ? '#000' : 'transparent',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: Platform.OS === 'web' ? 0.25 : 0,
-    shadowRadius: 24,
+    // Trên web: giới hạn chiều rộng tối đa 430px (chuẩn iPhone 15 Pro Max)
+    // và thêm bo góc + đổ bóng tạo hiệu ứng khung điện thoại thực
+    width: IS_WEB ? 430 : '100%',
+    maxWidth: IS_WEB ? 430 : undefined,
+    maxHeight: IS_WEB ? '95vh' : undefined,
+    borderRadius: IS_WEB ? 40 : 0,
+    overflow: IS_WEB ? 'hidden' : 'visible',
+    backgroundColor: '#fff',
+    shadowColor: '#1a2e1a',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: IS_WEB ? 0.18 : 0,
+    shadowRadius: IS_WEB ? 40 : 0,
   },
 });
