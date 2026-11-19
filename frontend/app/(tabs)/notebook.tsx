@@ -197,7 +197,7 @@ export default function NotebookScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.canvas} />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.topHeader}>
         <View>
@@ -514,11 +514,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryText,
   },
   bannerImg: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 0,
   },
   bannerScrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(12, 35, 20, 0.58)',
     zIndex: 1,
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   collectionOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(10, 26, 16, 0.42)',
   },
   collectionIcon: {
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   modalContent: {
     backgroundColor: COLORS.canvas,

@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   trendingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   recipeBadge: {

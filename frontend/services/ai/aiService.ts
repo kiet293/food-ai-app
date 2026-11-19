@@ -3,7 +3,7 @@ import { apiClient } from '../shared/apiClient';
 
 // cấu trúc dữ liệu cho phân tích món ăn
 export interface AIAnalysisResult {
-  ingredients: Array<{ name: string; probability: number }>;
+  ingredients: { name: string; probability: number }[];
   recipeName: string;
   instructions: string[];
   imageUrl?: string;
@@ -18,21 +18,39 @@ export const analyzeImagesWithAI = async (imageUris: string[]): Promise<AIAnalys
     const formData = new FormData();
 
     // 2. Lặp qua từng bức ảnh người dùng chọn và nhét vào thùng
-    imageUris.forEach((uri, index) => {
+    for (let index = 0; index < imageUris.length; index++) {
+      const uri = imageUris[index];
       // Trích xuất tên file và định dạng để Server hiểu
       const filename = uri.split('/').pop() || `photo_${index}.jpg`;
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : `image/jpeg`;
 
-      formData.append('image_files', {
-        uri: uri,
-        name: filename,
-        type: type,
-      } as any);
-    });
+      let appended = false;
+      // Nếu môi trường hỗ trợ Blob (WinterCG fetch) và không bật RN native fetch
+      if (process.env.EXPO_PUBLIC_USE_RN_FETCH !== '1' && typeof globalThis.fetch === 'function') {
+        try {
+          const res = await fetch(uri);
+          const blob = await res.blob();
+          if (blob && blob.size > 0) {
+            formData.append('image_files', blob, filename);
+            appended = true;
+          }
+        } catch {
+          // Fallback bên dưới
+        }
+      }
+
+      if (!appended) {
+        formData.append('image_files', {
+          uri: uri,
+          name: filename,
+          type: type,
+        } as any);
+      }
+    }
 
     console.log("🚀 Đang gửi", imageUris.length, "bức ảnh lên Server...");
-    return await apiClient.post(`${API_AI}/analyze`, formData);
+    return await apiClient.post(`${API_AI}/analyze`, formData, { timeoutMs: 120000 });
   } catch (error) {
     console.error("❌ Lỗi kết nối Server:", error);
     return {
@@ -58,7 +76,7 @@ export const requestNewRecipe = async (
       ingredients: ingredients,
       current_recipe: currentRecipe,
       user_message: userMessage
-    });
+    }, { timeoutMs: 120000 });
   } catch (error) {
     console.error("❌ Lỗi Chat AI:", error);
     return null;
@@ -69,7 +87,7 @@ export const requestNewRecipe = async (
 export const searchRecipes = async (ingredients: string[]): Promise<{ recipes: AIAnalysisResult[] }> => {
   try {
     console.log("🔎 Đang gửi danh sách nguyên liệu để tìm kiếm món ăn...");
-    return await apiClient.post(`${API_AI}/search`, { ingredients });
+    return await apiClient.post(`${API_AI}/search`, { ingredients }, { timeoutMs: 120000 });
   } catch (error) {
     console.error("❌ Lỗi tìm kiếm công thức:", error);
     return { recipes: [] };

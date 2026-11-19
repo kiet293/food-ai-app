@@ -12,7 +12,7 @@ def _get_model():
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY chưa được cấu hình")
     genai.configure(api_key=settings.gemini_api_key)
-    return genai.GenerativeModel("gemini-flash-latest")
+    return genai.GenerativeModel("gemini-3.5-flash")
 
 
 def _generate_json(prompt: str) -> dict:

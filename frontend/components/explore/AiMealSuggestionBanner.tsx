@@ -9,7 +9,12 @@ export const AiMealSuggestionBanner: React.FC = () => {
   return (
     <TouchableOpacity
       style={styles.bannerContainer}
-      onPress={() => router.push('/searchV2?q=gợi ý bữa ăn ngon hôm nay')}
+      onPress={() =>
+        router.push({
+          pathname: '/search',
+          params: { q: 'gợi ý bữa ăn ngon hôm nay', mode: 'ai' },
+        })
+      }
       activeOpacity={0.9}
     >
       <Image
@@ -61,7 +66,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(20, 50, 25, 0.55)',
   },
   contentWrap: {

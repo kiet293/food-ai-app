@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload, joinedload
 from sqlalchemy import func
 from typing import List, Optional
 
@@ -29,17 +29,15 @@ class CollectionService:
 
     @staticmethod
     def get_user_collections(db: Session, user_id: int) -> List[CollectionResponse]:
-        collections = db.query(CollectionDB).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.id.desc()).all()
+        collections = db.query(CollectionDB).options(selectinload(CollectionDB.recipe_associations).joinedload(CollectionRecipeDB.recipe)).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.id.desc()).all()
         
         result = []
         for col in collections:
-            count = db.query(CollectionRecipeDB).filter(CollectionRecipeDB.collection_id == col.id).count()
+            count = len(col.recipe_associations)
             
             cover_img = col.cover_image
             if not cover_img and count > 0:
-                first_assoc = db.query(CollectionRecipeDB).filter(
-                    CollectionRecipeDB.collection_id == col.id
-                ).order_by(CollectionRecipeDB.added_at.desc()).first()
+                first_assoc = max(col.recipe_associations, key=lambda a: (a.added_at, a.id), default=None)
                 if first_assoc and first_assoc.recipe and first_assoc.recipe.image_url:
                     cover_img = first_assoc.recipe.image_url
             
@@ -66,7 +64,7 @@ class CollectionService:
         if not col:
             return None
             
-        assocs = db.query(CollectionRecipeDB).filter(
+        assocs = db.query(CollectionRecipeDB).options(joinedload(CollectionRecipeDB.recipe)).filter(
             CollectionRecipeDB.collection_id == col.id
         ).order_by(CollectionRecipeDB.added_at.desc()).all()
         

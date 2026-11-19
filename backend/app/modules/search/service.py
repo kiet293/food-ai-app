@@ -5,7 +5,7 @@ from typing import Optional
 
 from app.core.exceptions import CustomException
 from app.modules.recipes.model import RecipeDB
-from app.modules.recipes.services import RecipeService
+from app.modules.recipes.services.presenter import format_recipe_summaries
 from app.modules.users.model import UserDB
 
 class SearchService:
@@ -37,7 +37,7 @@ class SearchService:
             total_pages = (total_items + limit - 1) // limit if total_items else 0
             
             recipes = query.offset((page - 1) * limit).limit(limit).all()
-            result_list = [RecipeService.format_recipe_summary(r) for r in recipes]
+            result_list = format_recipe_summaries(db, recipes)
             
             return {
                 "items": result_list,

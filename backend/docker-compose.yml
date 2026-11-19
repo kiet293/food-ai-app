@@ -14,6 +14,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-food_app_db}
     volumes:
       - postgres_data_new:/var/lib/postgresql/data # Lưu dữ liệu cứng, tắt Docker không bị mất
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   # ==========================================
   # 2. CỤM BACKEND (FASTAPI)
@@ -30,7 +35,19 @@ services:
       # Truyền đường dẫn kết nối DB cho FastAPI
       - DATABASE_URL=postgresql://${POSTGRES_USER:-food_app}:${POSTGRES_PASSWORD:-123456}@db:5432/${POSTGRES_DB:-food_app_db}
     depends_on:
-      - db # Chờ Database khởi động xong mới được chạy API
+      db:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    command: ["python", "-m", "app.workers"]
+    restart: unless-stopped
+    profiles: ["workers"]
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-food_app}:${POSTGRES_PASSWORD:-123456}@db:5432/${POSTGRES_DB:-food_app_db}
+    depends_on:
+      db:
+        condition: service_healthy
 
   # ==========================================
   # 3. CỤM FLYWAY (QUẢN LÝ MIGRATION DB)
@@ -39,7 +56,8 @@ services:
     image: flyway/flyway:9-alpine
     container_name: food_ai_flyway
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./migrations:/flyway/sql
     environment:

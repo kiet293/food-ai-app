@@ -139,7 +139,7 @@ export default function FollowListScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="dark-content" backgroundColor="#fafafa" />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -172,14 +172,14 @@ export default function FollowListScreen() {
         onEndReachedThreshold={0.5}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          state.loading ? null : (
+          state.loading ? undefined : (
             <Text style={styles.emptyText}>
               {activeTab === 'followers' ? 'Chưa có ai theo dõi' : 'Chưa follow ai'}
             </Text>
           )
         }
         ListFooterComponent={
-          state.loading ? <ActivityIndicator size="small" color="#FF5A5F" style={{ marginVertical: 20 }} /> : null
+          state.loading ? <ActivityIndicator size="small" color="#FF5A5F" style={{ marginVertical: 20 }} /> : undefined
         }
       />
     </SafeAreaView>

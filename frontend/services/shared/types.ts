@@ -7,3 +7,14 @@ export interface AuthorInfo {
   is_following?: boolean;
   is_self?: boolean;
 }
+
+
+export interface CommentInfo {
+  id: number;
+  content: string;
+  created_at: string;
+  user: AuthorInfo | null;
+  is_author?: boolean;
+  replies?: CommentInfo[];
+  parent_comment_id?: number;
+}

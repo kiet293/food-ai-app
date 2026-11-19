@@ -1,6 +1,8 @@
+from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException, BackgroundTasks
-import cloudinary.uploader
+from app.integrations.cloudinary import upload_asset, delete_image_url
 from typing import Optional
 from datetime import datetime
 
@@ -29,9 +31,10 @@ class UserService:
 
             # 3. Lấy danh sách Reels chính chủ do người dùng tự đăng
             my_reels_db = db.query(ReelDB).filter(ReelDB.user_id == current_user.id).order_by(ReelDB.created_at.desc()).all()
+            reel_like_counts = dict(db.query(ReelLikeDB.reel_id, func.count(ReelLikeDB.id)).filter(ReelLikeDB.reel_id.in_([r.id for r in my_reels_db])).group_by(ReelLikeDB.reel_id).all())
             my_reels = []
             for r in my_reels_db:
-                likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+                likes_cnt = reel_like_counts.get(r.id, 0)
                 my_reels.append({
                     "id": f"reel-{r.id}",
                     "db_id": r.id,
@@ -44,9 +47,10 @@ class UserService:
 
             # 4. Lấy danh sách Reels người dùng đã thích
             liked_reels_db = db.query(ReelDB).join(ReelLikeDB).filter(ReelLikeDB.user_id == current_user.id).order_by(ReelLikeDB.created_at.desc()).all()
+            reel_like_counts = dict(db.query(ReelLikeDB.reel_id, func.count(ReelLikeDB.id)).filter(ReelLikeDB.reel_id.in_([r.id for r in liked_reels_db])).group_by(ReelLikeDB.reel_id).all())
             liked_reels = []
             for r in liked_reels_db:
-                likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+                likes_cnt = reel_like_counts.get(r.id, 0)
                 liked_reels.append({
                     "id": f"reel-{r.id}",
                     "db_id": r.id,
@@ -104,54 +108,36 @@ class UserService:
 
     @staticmethod
     def update_profile(db: Session, current_user: UserDB, update_data: UserUpdate):
-        # Cập nhật tên hiển thị
-        if update_data.full_name is not None:
-            current_user.full_name = update_data.full_name
-
-        # Cập nhật tiểu sử
-        if update_data.bio is not None:
-            current_user.bio = update_data.bio
-
-        # Cập nhật avatar
-        if update_data.avatar is not None:
-            # Xóa ảnh cũ trên Cloudinary nếu đang có ảnh và avatar mới khác ảnh cũ
-            if current_user.avatar and current_user.avatar.startswith("http") and current_user.avatar != update_data.avatar:
-                try:
-                    public_id = current_user.avatar.split("/")[-1].split(".")[0]
-                    import cloudinary.uploader
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print("Lỗi xóa ảnh cũ:", e)
-                    
-            current_user.avatar = update_data.avatar  
-            
-        db.commit()
-        db.refresh(current_user)
+        old_image = current_user.avatar
+        try:
+            for field in ('full_name', 'bio', 'avatar'):
+                value = getattr(update_data, field)
+                if value is not None:
+                    setattr(current_user, field, value)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if update_data.avatar is not None and update_data.avatar != old_image:
+            delete_image_url(old_image)
         return {"message": "Cập nhật hồ sơ thành công!"}
 
     @staticmethod
     def update_avatar_file(db: Session, current_user: UserDB, file: UploadFile):
+        old_image = current_user.avatar
+        image_url = None
         try:
-            # Xóa ảnh cũ trên Cloudinary nếu nó là link ảnh
-            if current_user.avatar and current_user.avatar.startswith("http"):
-                try:
-                    public_id = current_user.avatar.split("/")[-1].split(".")[0]
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print("Lỗi xóa ảnh cũ:", e)
-                    
-            # Upload image to Cloudinary
-            upload_result = cloudinary.uploader.upload(file.file)
-            image_url = upload_result.get("secure_url")
-            
-            # Update user avatar
+            image_url = upload_asset(file.file).get("secure_url")
+            if not image_url:
+                raise RuntimeError("Upload provider returned no image URL")
             current_user.avatar = image_url
             db.commit()
-            db.refresh(current_user)
-            
-            return {"message": "Cập nhật ảnh đại diện thành công!", "avatar_url": image_url}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as exc:
+            db.rollback()
+            delete_image_url(image_url)
+            raise HTTPException(status_code=500, detail="Không thể cập nhật ảnh đại diện") from exc
+        delete_image_url(old_image)
+        return {"message": "Cập nhật ảnh đại diện thành công!", "avatar_url": image_url}
 
     @staticmethod
     def get_popular_chefs(db: Session):
@@ -191,9 +177,10 @@ class UserService:
         total_likes_count = db.query(ReelLikeDB).join(ReelDB).filter(ReelDB.user_id == user.id).count()
 
         my_reels_db = db.query(ReelDB).filter(ReelDB.user_id == user.id).order_by(ReelDB.created_at.desc()).all()
+        reel_like_counts = dict(db.query(ReelLikeDB.reel_id, func.count(ReelLikeDB.id)).filter(ReelLikeDB.reel_id.in_([r.id for r in my_reels_db])).group_by(ReelLikeDB.reel_id).all())
         my_reels = []
         for r in my_reels_db:
-            likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+            likes_cnt = reel_like_counts.get(r.id, 0)
             my_reels.append({
                 "id": f"reel-{r.id}",
                 "db_id": r.id,
@@ -205,9 +192,10 @@ class UserService:
             })
 
         liked_reels_db = db.query(ReelDB).join(ReelLikeDB).filter(ReelLikeDB.user_id == user.id).order_by(ReelLikeDB.created_at.desc()).all()
+        reel_like_counts = dict(db.query(ReelLikeDB.reel_id, func.count(ReelLikeDB.id)).filter(ReelLikeDB.reel_id.in_([r.id for r in liked_reels_db])).group_by(ReelLikeDB.reel_id).all())
         liked_reels = []
         for r in liked_reels_db:
-            likes_cnt = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == r.id).count()
+            likes_cnt = reel_like_counts.get(r.id, 0)
             liked_reels.append({
                 "id": f"reel-{r.id}",
                 "db_id": r.id,
@@ -223,7 +211,7 @@ class UserService:
             RecipeDB.is_ai == False
         ).order_by(RecipeDB.created_at.desc()).limit(10).all()
 
-        collections = db.query(CollectionDB).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.created_at.desc()).all()
+        collections = db.query(CollectionDB).options(selectinload(CollectionDB.recipe_associations).joinedload(CollectionRecipeDB.recipe)).filter(CollectionDB.user_id == user_id).order_by(CollectionDB.created_at.desc()).all()
         
         recent_data = [
             {
@@ -235,8 +223,8 @@ class UserService:
         
         collections_data = []
         for c in collections:
-            count = db.query(CollectionRecipeDB).filter(CollectionRecipeDB.collection_id == c.id).count()
-            first_cr = db.query(CollectionRecipeDB).filter(CollectionRecipeDB.collection_id == c.id).first()
+            count = len(c.recipe_associations)
+            first_cr = min(c.recipe_associations, key=lambda a: a.id, default=None)
             image_url = "https://images.unsplash.com/photo-1490818387583-1b5ba4597389?w=500&q=80"
             if first_cr and first_cr.recipe and first_cr.recipe.image_url:
                 image_url = first_cr.recipe.image_url

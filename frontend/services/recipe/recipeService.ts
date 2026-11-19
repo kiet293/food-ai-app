@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiBaseUrl } from '../shared/apiConfig';
 import { apiClient } from '../shared/apiClient';
 import { AuthorInfo } from '../shared/types';
-import { CommentInfo } from '../community/communityService';
+import type { CommentInfo } from '../shared/types';
 import { AIAnalysisResult } from '../ai/aiService';
 
 export interface ExploreGridItem {
@@ -205,7 +205,7 @@ export interface PopularRecipe {
   recipeName: string;
   scanCount: number;
   saveCount: number;
-  ingredients: Array<{ name: string; probability: number }>;
+  ingredients: { name: string; probability: number }[];
   instructions: string[];
   imageUrl?: string;
 }
@@ -273,4 +273,51 @@ export const getPopularRecipes = async (): Promise<PopularRecipe[]> => {
     console.error("❌ Lỗi khi tải danh sách phổ biến:", error);
     return [];
   }
+};
+
+
+export const postRecipeComment = async (recipeId: number, content: string, parentCommentId?: number): Promise<CommentInfo | null> => {
+  try {
+    const json = await apiClient.post(`${API_BASE_URL}/recipes/${recipeId}/comments`, {
+      content,
+      parent_comment_id: parentCommentId || null
+    });
+    return json.data;
+  } catch (error) {
+    console.error("❌ Lỗi khi đăng bình luận:", error);
+    return null;
+  }
+};
+
+export const postRecipeRating = async (recipeId: number, score: number, comment?: string): Promise<boolean> => {
+  try {
+    await apiClient.post(`${API_BASE_URL}/recipes/${recipeId}/rate`, {
+      score,
+      comment: comment || null
+    });
+    return true;
+  } catch (error) {
+    console.error("❌ Lỗi khi đăng đánh giá:", error);
+    return false;
+  }
+};
+
+export const favoriteRecipe = async (recipeId: number) => {
+    try {
+        const resData = await apiClient.post(`${API_BASE_URL}/recipes/${recipeId}/favorite`);
+        return resData.data; // Trả về { isFavorited: boolean }
+    } catch (error) {
+        console.error("❌ Lỗi favoriteRecipe:", error);
+        throw error;
+    }
+};
+
+export const unfavoriteRecipe = async (recipeId: number) => {
+    try {
+        const resData = await apiClient.delete(`${API_BASE_URL}/recipes/${recipeId}/favorite`);
+        return resData.data; // Trả về { isFavorited: boolean }
+    } catch (error) {
+        console.error("❌ Lỗi unfavoriteRecipe:", error);
+        throw error;
+    }
 };

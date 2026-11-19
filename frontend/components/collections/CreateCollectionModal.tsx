@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 33, 20, 0.48)',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   keyboardWrap: {
     justifyContent: 'flex-end',

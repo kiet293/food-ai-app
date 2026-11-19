@@ -1,6 +1,8 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import case, func
+from app.core.config import get_settings
 from fastapi import UploadFile, status, BackgroundTasks
-import cloudinary.uploader
+from app.integrations.cloudinary import upload_asset, destroy_asset
 from typing import Optional
 
 from app.core.exceptions import CustomException
@@ -14,49 +16,42 @@ from .pexels_service import PexelsService
 
 class ReelService:
     @staticmethod
-    def get_reels_list(db: Session, current_user: Optional[UserDB]):
+    def get_reels_list(db: Session, current_user: Optional[UserDB], page: int = 1, limit: int = 20, reel_id: Optional[int] = None):
         try:
-            # Tự động đồng bộ thêm video nấu ăn từ Pexels API
-            PexelsService.sync_pexels_cooking_videos(db)
-            
-            # 1. Nếu có người dùng đăng nhập, lấy video do chính họ đăng tải
-            my_reels = []
-            if current_user:
-                my_reels = db.query(ReelDB).filter(ReelDB.user_id == current_user.id).order_by(ReelDB.created_at.desc()).all()
-
-            my_reel_ids = [r.id for r in my_reels]
-
-            # 2. Lấy các video của người dùng thật khác (không phải Pexels và chưa gồm my_reels)
-            other_user_reels = db.query(ReelDB).join(UserDB).filter(
-                ~UserDB.username.startswith("pexels_user_"),
-                ~ReelDB.id.in_(my_reel_ids) if my_reel_ids else True
-            ).order_by(ReelDB.created_at.desc()).all()
-
-            # 3. Các video nạp tự động từ Pexels xếp nối tiếp phía sau
-            pexels_reels = db.query(ReelDB).join(UserDB).filter(UserDB.username.startswith("pexels_user_")).order_by(ReelDB.created_at.desc()).all()
-
-            reels = my_reels + other_user_reels + pexels_reels
-            
+            # External synchronization is opt-in; ordinary feed reads stay local.
+            if get_settings().sync_pexels_on_read:
+                PexelsService.sync_pexels_cooking_videos(db)
+            priority = case(
+                (ReelDB.user_id == current_user.id, 0),
+                (UserDB.username.startswith("pexels_user_"), 2), else_=1,
+            ) if current_user else case((UserDB.username.startswith("pexels_user_"), 2), else_=1)
+            query = db.query(ReelDB).join(UserDB).options(
+                joinedload(ReelDB.author), joinedload(ReelDB.recipe),
+            )
+            if reel_id is not None:
+                query = query.filter(ReelDB.id == reel_id)
+            reels = query.order_by(priority, ReelDB.created_at.desc(), ReelDB.id.desc()).offset(
+                (max(1, page) - 1) * min(100, max(1, limit))
+            ).limit(min(100, max(1, limit))).all()
+            ids = [r.id for r in reels]
+            def counts(model):
+                return dict(db.query(model.reel_id, func.count(model.id)).filter(
+                    model.reel_id.in_(ids)).group_by(model.reel_id).all())
+            likes = counts(ReelLikeDB) if ids else {}
+            comments = counts(ReelCommentDB) if ids else {}
+            liked, followed = set(), set()
+            if current_user and ids:
+                liked = {r[0] for r in db.query(ReelLikeDB.reel_id).filter(
+                    ReelLikeDB.user_id == current_user.id, ReelLikeDB.reel_id.in_(ids)).all()}
+                followed = {r[0] for r in db.query(FollowDB.following_id).filter(
+                    FollowDB.follower_id == current_user.id,
+                    FollowDB.following_id.in_({r.user_id for r in reels})).all()}
             result_list = []
             for reel in reels:
-                is_liked = False
-                if current_user:
-                    like_exists = db.query(ReelLikeDB).filter(
-                        ReelLikeDB.reel_id == reel.id,
-                        ReelLikeDB.user_id == current_user.id
-                    ).first()
-                    is_liked = like_exists is not None
-
-                likes_count = db.query(ReelLikeDB).filter(ReelLikeDB.reel_id == reel.id).count()
-                comments_count = db.query(ReelCommentDB).filter(ReelCommentDB.reel_id == reel.id).count()
-
-                is_following = False
-                if current_user:
-                    follow_exists = db.query(FollowDB).filter(
-                        FollowDB.follower_id == current_user.id,
-                        FollowDB.following_id == reel.user_id
-                    ).first()
-                    is_following = follow_exists is not None
+                is_liked = reel.id in liked
+                likes_count = likes.get(reel.id, 0)
+                comments_count = comments.get(reel.id, 0)
+                is_following = reel.user_id in followed
 
                 recipe_info = None
                 if reel.recipe:
@@ -72,7 +67,8 @@ class ReelService:
                     "db_id": reel.id,
                     "isPexels": reel.author.username.startswith("pexels_user_"),
                     "author": {
-                        "id": f"user-{reel.author.id}",
+                        "id": str(reel.author.id),
+                        "db_id": reel.author.id,
                         "name": reel.author.full_name or reel.author.username,
                         "avatar": reel.author.avatar,
                         "isFollowing": is_following
@@ -189,23 +185,21 @@ class ReelService:
     @staticmethod
     def get_reel_comments(db: Session, current_user: Optional[UserDB], reel_id: int):
         try:
-            comments = db.query(ReelCommentDB).filter(
+            comments = db.query(ReelCommentDB).options(joinedload(ReelCommentDB.user)).filter(
                 ReelCommentDB.reel_id == reel_id
             ).order_by(ReelCommentDB.created_at.desc()).all()
 
+            ids = [comment.id for comment in comments]
+            counts = dict(db.query(ReelCommentLikeDB.comment_id, func.count(ReelCommentLikeDB.id)).filter(
+                ReelCommentLikeDB.comment_id.in_(ids)).group_by(ReelCommentLikeDB.comment_id).all()) if ids else {}
+            liked = set()
+            if current_user and ids:
+                liked = {row[0] for row in db.query(ReelCommentLikeDB.comment_id).filter(
+                    ReelCommentLikeDB.comment_id.in_(ids), ReelCommentLikeDB.user_id == current_user.id).all()}
             result = []
             for c in comments:
-                is_liked = False
-                if current_user:
-                    like_exists = db.query(ReelCommentLikeDB).filter(
-                        ReelCommentLikeDB.comment_id == c.id,
-                        ReelCommentLikeDB.user_id == current_user.id
-                    ).first()
-                    is_liked = like_exists is not None
-
-                likes_count = db.query(ReelCommentLikeDB).filter(
-                    ReelCommentLikeDB.comment_id == c.id
-                ).count()
+                is_liked = c.id in liked
+                likes_count = counts.get(c.id, 0)
 
                 result.append({
                     "id": c.id,
@@ -392,7 +386,7 @@ class ReelService:
 
             # Upload video lên Cloudinary
             try:
-                upload_result = cloudinary.uploader.upload(
+                upload_result = upload_asset(
                     video.file,
                     resource_type="video",
                     folder="food_ai_reels"
