@@ -52,3 +52,14 @@ def get_optional_current_user(
 
     user_id = _decode_user_id(token)
     return UserRepository.get_by_id(db, user_id) if user_id else None
+
+
+def get_current_admin(
+    current_user: UserDB = Depends(get_current_user),
+) -> UserDB:
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Yêu cầu quyền quản trị viên",
+        )
+    return current_user

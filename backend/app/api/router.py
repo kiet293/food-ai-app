@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.modules.admin.router import router as admin_router
 from app.modules.ai.router import router as ai_router
 from app.modules.collections.router import router as collection_router
 from app.modules.notifications.router import router as notification_router
@@ -43,6 +44,7 @@ def register_api_routers(app: FastAPI) -> None:
         tags=["Collection Management"],
     )
     app.include_router(notification_router)
+    app.include_router(admin_router, prefix="/api/admin", tags=["Admin Management"])
 
 
 __all__ = ["register_api_routers"]
