@@ -23,6 +23,24 @@ import { getWsBaseUrl } from '@/services/shared/apiConfig';
 
 const { width } = Dimensions.get('window');
 
+const formatTimeAgo = (dateString?: string | null): string => {
+  if (!dateString) return 'Vừa xong';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Vừa xong';
+  const now = new Date();
+  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSeconds < 60) return 'Vừa xong';
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Hôm qua';
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
 interface RecipeFeedListProps {
   fetchData: (startId: number | null, limit: number, tag: string | null) => Promise<ExploreFeedResponse>;
   initialStartId?: number | null;
@@ -259,7 +277,11 @@ export const RecipeFeedList: React.FC<RecipeFeedListProps> = ({
             )}
             <View style={styles.authorTextContainer}>
               <Text style={styles.authorName}>{item.author?.name || 'Đầu bếp'}</Text>
-              <Text style={styles.authorHandle}>{item.author?.handle || '@user'}</Text>
+              <View style={styles.authorSubRow}>
+                <Text style={styles.authorHandle}>{item.author?.handle || '@user'}</Text>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.postTimeText}>{formatTimeAgo(item.created_at)}</Text>
+              </View>
             </View>
           </TouchableOpacity>
 
@@ -489,11 +511,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#1a2e1a',
-    marginBottom: 1,
+    marginBottom: 2,
+  },
+  authorSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   authorHandle: {
     fontSize: 12,
     color: '#78909c',
+  },
+  metaDot: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginHorizontal: 5,
+    fontWeight: '700',
+  },
+  postTimeText: {
+    fontSize: 12,
+    color: '#94a3b8',
   },
   followButton: {
     backgroundColor: '#28a745',
@@ -518,18 +554,17 @@ const styles = StyleSheet.create({
   },
   // ─── IMAGE CARD ───────────────────────────────────────────────
   imageCard: {
-    width: width - 24,
-    height: (width - 24) * 0.72,
-    borderRadius: 20,
-    alignSelf: 'center',
+    marginHorizontal: 16,
+    height: (width - 32) * 0.72,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#e8f5e9',
     position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   recipeImage: {
     width: '100%',
@@ -542,7 +577,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 70,
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: 'rgba(0,0,0,0.06)',
   },
   // ─── DETAILS SECTION ─────────────────────────────────────────
   detailsSection: {
@@ -561,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   ratingBadge: {
     flexDirection: 'row',

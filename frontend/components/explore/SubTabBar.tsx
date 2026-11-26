@@ -19,7 +19,7 @@ export const SubTabBar: React.FC<SubTabBarProps> = ({ activeTab, setActiveTab })
             activeTab === 'GLOBAL' && styles.subTabTextActive,
           ]}
         >
-          GLOBAL
+          Cộng đồng
         </Text>
         {activeTab === 'GLOBAL' && <View style={styles.activeTabLine} />}
       </TouchableOpacity>
@@ -34,7 +34,7 @@ export const SubTabBar: React.FC<SubTabBarProps> = ({ activeTab, setActiveTab })
             activeTab === 'FOLLOWING' && styles.subTabTextActive,
           ]}
         >
-          FOLLOWING
+          Đang theo dõi
         </Text>
         {activeTab === 'FOLLOWING' && <View style={styles.activeTabLine} />}
       </TouchableOpacity>

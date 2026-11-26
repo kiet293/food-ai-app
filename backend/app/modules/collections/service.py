@@ -3,7 +3,7 @@ from sqlalchemy import func
 from typing import List, Optional
 
 from app.modules.collections.model import CollectionDB, CollectionRecipeDB
-from app.modules.collections.schema import CollectionCreate, CollectionDetailResponse, CollectionResponse
+from app.modules.collections.schema import CollectionCreate, CollectionUpdate, CollectionDetailResponse, CollectionResponse
 from app.modules.recipes.model import RecipeDB
 from app.modules.users.model import UserDB
 
@@ -82,6 +82,34 @@ class CollectionService:
             recipe_count=len(recipes),
             created_at=col.created_at,
             recipes=recipes
+        )
+
+    @staticmethod
+    def update_collection(db: Session, collection_id: int, user_id: int, collection_in: CollectionUpdate) -> Optional[CollectionResponse]:
+        col = CollectionService.get_collection_by_id(db, collection_id, user_id)
+        if not col:
+            return None
+        col.name = collection_in.name.strip()
+        if collection_in.cover_image is not None:
+            col.cover_image = collection_in.cover_image
+        db.commit()
+        db.refresh(col)
+
+        assocs = db.query(CollectionRecipeDB).options(joinedload(CollectionRecipeDB.recipe)).filter(
+            CollectionRecipeDB.collection_id == col.id
+        ).order_by(CollectionRecipeDB.added_at.desc()).all()
+        count = len(assocs)
+        cover_img = col.cover_image
+        if not cover_img and count > 0 and assocs[0].recipe and assocs[0].recipe.image_url:
+            cover_img = assocs[0].recipe.image_url
+
+        return CollectionResponse(
+            id=col.id,
+            user_id=col.user_id,
+            name=col.name,
+            cover_image=cover_img,
+            recipe_count=count,
+            created_at=col.created_at
         )
 
     @staticmethod

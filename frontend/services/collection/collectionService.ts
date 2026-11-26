@@ -69,6 +69,33 @@ export const createCollection = async (name: string, coverImage?: string): Promi
 };
 
 /**
+ * Cập nhật tên bộ sưu tập
+ */
+export const updateCollection = async (id: string, name: string): Promise<CollectionFolder | null> => {
+  try {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new Error("Tên bộ sưu tập không được để trống");
+    }
+
+    const item = await apiClient.put(`${COLLECTIONS_API_URL}/${id}`, {
+      name: trimmedName,
+    });
+
+    return {
+      id: item.id?.toString() || id,
+      name: item.name || trimmedName,
+      recipeCount: item.recipe_count || 0,
+      coverImage: item.cover_image || DEFAULT_COVER_IMAGE,
+      createdAt: item.created_at,
+    };
+  } catch (error: any) {
+    console.error("❌ Lỗi khi cập nhật bộ sưu tập:", error.message || error);
+    throw error;
+  }
+};
+
+/**
  * Xóa bộ sưu tập
  */
 export const deleteCollection = async (id: string): Promise<boolean> => {

@@ -18,7 +18,7 @@ export const PopularChefsSection: React.FC<PopularChefsSectionProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>POPULAR CHEFS.</Text>
+        <Text style={styles.sectionTitle}>Đầu bếp nổi bật</Text>
       </View>
       <ScrollView
         horizontal

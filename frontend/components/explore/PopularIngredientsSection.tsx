@@ -29,7 +29,7 @@ export const PopularIngredientsSection: React.FC<PopularIngredientsSectionProps>
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>NGUYÊN LIỆU PHỔ BIẾN.</Text>
+        <Text style={styles.sectionTitle}>Nguyên liệu phổ biến</Text>
       </View>
       <ScrollView
         horizontal

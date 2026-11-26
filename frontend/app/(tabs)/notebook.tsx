@@ -1,10 +1,11 @@
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -12,6 +13,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -23,7 +25,9 @@ import { CreateCollectionModal } from '../../components/collections/CreateCollec
 import {
   getCollections,
   createCollection,
+  updateCollection,
   deleteCollection,
+  removeRecipeFromCollection,
   CollectionFolder,
   getCollectionDetail,
   getAllRecipesInCollections,
@@ -33,14 +37,14 @@ const { width } = Dimensions.get('window');
 const COLLECTION_CARD_WIDTH = (width - 44) / 2;
 
 const COLORS = {
-  canvas: '#F6F3EA',
+  canvas: '#FFFFFF',
   surface: '#FFFFFF',
-  mutedSurface: '#F0F4F0',
+  mutedSurface: '#F3F7F4',
   primaryText: '#1A3A1A',
-  secondaryText: '#6B8F6B',
-  accent: '#2ECC71',
-  accentSoft: '#DFF3EA',
-  border: '#E8E2D8',
+  secondaryText: '#64748B',
+  accent: '#28A745',
+  accentSoft: '#E8F5E9',
+  border: '#E8F0E8',
   softBorder: '#E4ECE5',
   danger: '#D95C5C',
   white: '#FFFFFF',
@@ -82,8 +86,21 @@ export default function NotebookScreen() {
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [displayedRecipes, setDisplayedRecipes] = useState<any[]>([]);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  
+  const [editingCollection, setEditingCollection] = useState<CollectionFolder | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [isSavingRename, setIsSavingRename] = useState(false);
+  const [isSelectingRecipes, setIsSelectingRecipes] = useState(false);
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
+  const [isRemovingSelected, setIsRemovingSelected] = useState(false);
+
   const router = useRouter();
+  const { collectionId } = useLocalSearchParams<{ collectionId?: string }>();
+
+  React.useEffect(() => {
+    if (collectionId) {
+      setSelectedCollectionFilter(String(collectionId));
+    }
+  }, [collectionId]);
 
   const loadData = useCallback(async () => {
     setLoadingCollections(true);
@@ -114,6 +131,8 @@ export default function NotebookScreen() {
   );
 
   React.useEffect(() => {
+    setIsSelectingRecipes(false);
+    setSelectedRecipeIds([]);
     if (selectedCollectionFilter) {
       const fetchDetail = async () => {
         setIsLoadingDetail(true);
@@ -180,6 +199,116 @@ export default function NotebookScreen() {
     );
   };
 
+  const openRenameCollectionModal = (collection: CollectionFolder) => {
+    setEditingCollection(collection);
+    setEditingName(collection.name);
+  };
+
+  const handleSaveRenameCollection = async () => {
+    if (!editingCollection) return;
+    const trimmed = editingName.trim();
+    if (!trimmed) {
+      Alert.alert('Lỗi', 'Tên bộ sưu tập không được để trống');
+      return;
+    }
+    setIsSavingRename(true);
+    try {
+      const updated = await updateCollection(editingCollection.id, trimmed);
+      if (updated) {
+        setCollections((prev) =>
+          prev.map((col) => (col.id === editingCollection.id ? { ...col, name: updated.name } : col))
+        );
+      }
+      setEditingCollection(null);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể đổi tên bộ sưu tập');
+    } finally {
+      setIsSavingRename(false);
+    }
+  };
+
+  const handleCollectionOptions = (collection: CollectionFolder) => {
+    Alert.alert(
+      `Bộ sưu tập “${collection.name}”`,
+      'Chọn thao tác bạn muốn thực hiện:',
+      [
+        {
+          text: 'Đổi tên bộ sưu tập',
+          onPress: () => openRenameCollectionModal(collection),
+        },
+        {
+          text: 'Xóa bộ sưu tập',
+          style: 'destructive',
+          onPress: () => confirmDeleteCollection(collection.id, collection.name),
+        },
+        { text: 'Hủy', style: 'cancel' },
+      ]
+    );
+  };
+
+  const toggleSelectRecipe = (recipeId: string) => {
+    setSelectedRecipeIds((prev) =>
+      prev.includes(recipeId) ? prev.filter((id) => id !== recipeId) : [...prev, recipeId]
+    );
+  };
+
+  const handleConfirmDeleteSelectedRecipes = () => {
+    if (selectedRecipeIds.length === 0) return;
+
+    const count = selectedRecipeIds.length;
+    const isInCollection = !!selectedCollectionFilter && !!selectedCollection;
+
+    Alert.alert(
+      isInCollection ? 'Xóa khỏi bộ sưu tập' : 'Xóa công thức',
+      isInCollection
+        ? `Bạn có muốn xóa ${count} công thức đã chọn khỏi bộ sưu tập “${selectedCollection.name}” không?`
+        : `Bạn có muốn xóa ${count} công thức đã chọn khỏi Sổ tay không?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRemovingSelected(true);
+            try {
+              if (isInCollection && selectedCollectionFilter) {
+                await Promise.all(
+                  selectedRecipeIds.map((rid) => removeRecipeFromCollection(selectedCollectionFilter, rid))
+                );
+                setDisplayedRecipes((prev) => prev.filter((r) => !selectedRecipeIds.includes(r.id)));
+                setCollections((prev) =>
+                  prev.map((col) =>
+                    col.id === selectedCollectionFilter
+                      ? { ...col, recipeCount: Math.max(0, (col.recipeCount || count) - count) }
+                      : col
+                  )
+                );
+                const allRecipes = await getAllRecipesInCollections();
+                setSavedList(
+                  allRecipes.map((r: any) => ({
+                    id: r.id.toString(),
+                    recipeName: r.recipe_name || r.title || 'Công thức',
+                    imageUrl: r.image_url || r.image || '',
+                    savedAt: r.created_at || new Date().toISOString(),
+                  }))
+                );
+              } else {
+                await Promise.all(selectedRecipeIds.map((rid) => deleteRecipe(rid)));
+                await loadData();
+              }
+              setSelectedRecipeIds([]);
+              setIsSelectingRecipes(false);
+            } catch (error: any) {
+              Alert.alert('Lỗi', error.message || 'Không thể xóa các công thức đã chọn');
+            } finally {
+              setIsRemovingSelected(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCreateCollection = async (name: string) => {
     try {
       const newCol = await createCollection(name);
@@ -229,10 +358,6 @@ export default function NotebookScreen() {
             resizeMode="cover"
           />
           <View style={styles.bannerScrim} />
-          <View style={styles.bannerBadge}>
-            <Ionicons name="sparkles" size={14} color={COLORS.primaryText} />
-            <Text style={styles.bannerBadgeText}>GỢI Ý</Text>
-          </View>
           <View style={styles.bannerContent}>
             <Text style={styles.bannerTitle}>Gom công thức theo cách của bạn</Text>
             <View style={styles.bannerActionRow}>
@@ -247,7 +372,9 @@ export default function NotebookScreen() {
             <Text style={styles.sectionTitle}>Bộ sưu tập</Text>
             <Text style={styles.sectionSubtitle}>Sắp xếp món ăn để tìm nhanh hơn</Text>
           </View>
-          <Text style={styles.sectionCount}>{collections.length} nhóm</Text>
+          <View style={styles.recipeCountBadge}>
+            <Text style={styles.recipeCountText}>{collections.length}</Text>
+          </View>
         </View>
 
         <View style={styles.collectionsGrid}>
@@ -268,26 +395,69 @@ export default function NotebookScreen() {
           ) : (
             collections.map((collection) => {
               const isSelected = selectedCollectionFilter === collection.id;
+              const isEmpty = (collection.recipeCount || 0) === 0;
               return (
                 <TouchableOpacity
                   key={collection.id}
-                  style={[styles.collectionCard, isSelected && styles.collectionCardActive]}
+                  style={[
+                    styles.collectionCard,
+                    isEmpty && styles.collectionCardEmpty,
+                    isSelected && styles.collectionCardActive,
+                  ]}
                   onPress={() => setSelectedCollectionFilter(isSelected ? null : collection.id)}
-                  onLongPress={() => confirmDeleteCollection(collection.id, collection.name)}
+                  onLongPress={() => handleCollectionOptions(collection)}
                   activeOpacity={0.86}
                   accessibilityRole="button"
                   accessibilityLabel={`Bộ sưu tập ${collection.name}`}
                   accessibilityState={{ selected: isSelected }}
                 >
-                  <Image source={{ uri: collection.coverImage }} style={styles.collectionImage} />
-                  <View style={styles.collectionOverlay} />
-                  <View style={styles.collectionIcon}>
-                    <Ionicons name={isSelected ? 'folder-open' : 'folder-open-outline'} size={15} color={COLORS.white} />
-                  </View>
-                  <View style={styles.collectionContent}>
-                    <Text style={styles.collectionName} numberOfLines={1}>{collection.name}</Text>
-                    <Text style={styles.collectionSub}>{collection.recipeCount} công thức</Text>
-                  </View>
+                  {isEmpty ? (
+                    <View style={styles.emptyCardInner}>
+                      <View style={styles.emptyCardTopRow}>
+                        <View style={styles.collectionIconEmpty}>
+                          <Ionicons
+                            name={isSelected ? 'folder-open' : 'folder-open-outline'}
+                            size={15}
+                            color={COLORS.accent}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={styles.emptyCardPlusBadge}
+                          onPress={() => handleCollectionOptions(collection)}
+                          hitSlop={8}
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={14} color={COLORS.accent} />
+                        </TouchableOpacity>
+                      </View>
+                      <View>
+                        <Text style={styles.collectionNameEmpty} numberOfLines={1}>
+                          {collection.name}
+                        </Text>
+                        <Text style={styles.collectionSubEmpty} numberOfLines={1}>
+                          Thêm công thức đầu tiên
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <Image source={{ uri: collection.coverImage }} style={styles.collectionImage} />
+                      <View style={styles.collectionOverlay} />
+                      <View style={styles.collectionIcon}>
+                        <Ionicons name={isSelected ? 'folder-open' : 'folder-open-outline'} size={15} color={COLORS.white} />
+                      </View>
+                      <TouchableOpacity
+                        style={styles.collectionMenuBtn}
+                        onPress={() => handleCollectionOptions(collection)}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="ellipsis-horizontal" size={15} color={COLORS.white} />
+                      </TouchableOpacity>
+                      <View style={styles.collectionContent}>
+                        <Text style={styles.collectionName} numberOfLines={1}>{collection.name}</Text>
+                        <Text style={styles.collectionSub}>{collection.recipeCount} công thức</Text>
+                      </View>
+                    </>
+                  )}
                 </TouchableOpacity>
               );
             })
@@ -295,14 +465,30 @@ export default function NotebookScreen() {
         </View>
 
         <View style={[styles.sectionHeader, styles.recipeSectionHeader]}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.sectionTitle}>Công thức đã lưu</Text>
             <Text style={styles.sectionSubtitle}>
-              {selectedCollection ? `Đang xem nhóm “${selectedCollection.name}”` : 'Những món bạn muốn nấu lại'}
+              {selectedCollection ? `Đang xem bộ sưu tập “${selectedCollection.name}”` : 'Những món bạn muốn nấu lại'}
             </Text>
           </View>
-          <View style={styles.recipeCountBadge}>
-            <Text style={styles.recipeCountText}>{displayedRecipes.length}</Text>
+          <View style={styles.recipeHeaderRight}>
+            {displayedRecipes.length > 0 && (
+              <TouchableOpacity
+                style={[styles.selectModeBtn, isSelectingRecipes && styles.selectModeBtnActive]}
+                onPress={() => {
+                  setIsSelectingRecipes((prev) => !prev);
+                  setSelectedRecipeIds([]);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.selectModeBtnText, isSelectingRecipes && styles.selectModeBtnTextActive]}>
+                  {isSelectingRecipes ? 'Hủy' : 'Chọn xóa'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.recipeCountBadge}>
+              <Text style={styles.recipeCountText}>{displayedRecipes.length}</Text>
+            </View>
           </View>
         </View>
 
@@ -310,7 +496,7 @@ export default function NotebookScreen() {
           <View style={styles.activeFilterRow}>
             <View style={styles.activeFilterCopy}>
               <Ionicons name="funnel-outline" size={15} color={COLORS.accent} />
-              <Text style={styles.activeFilterText}>{selectedCollection.name}</Text>
+              <Text style={styles.activeFilterText} numberOfLines={1}>{selectedCollection.name}</Text>
             </View>
             <TouchableOpacity
               onPress={() => setSelectedCollectionFilter(null)}
@@ -323,28 +509,85 @@ export default function NotebookScreen() {
           </View>
         )}
 
+        {isSelectingRecipes && (
+          <View style={styles.selectionActionBar}>
+            <Text style={styles.selectionCountText}>
+              {selectedRecipeIds.length > 0
+                ? `Đã chọn ${selectedRecipeIds.length} món`
+                : 'Chạm vào món ăn bạn muốn xóa'}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.confirmDeleteSelectedBtn,
+                (selectedRecipeIds.length === 0 || isRemovingSelected) && { opacity: 0.45 },
+              ]}
+              disabled={selectedRecipeIds.length === 0 || isRemovingSelected}
+              onPress={handleConfirmDeleteSelectedRecipes}
+              activeOpacity={0.85}
+            >
+              {isRemovingSelected ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={15} color="#fff" />
+                  <Text style={styles.confirmDeleteSelectedText}>
+                    Xóa{selectedRecipeIds.length > 0 ? ` (${selectedRecipeIds.length})` : ''}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
         {isLoadingDetail ? (
           <ActivityIndicator size="small" color={COLORS.accent} style={{ margin: 20 }} />
         ) : displayedRecipes.length > 0 ? (
           <View style={styles.gridContainer}>
-            {displayedRecipes.map((item) => (
-              <TouchableOpacity
-                key={`grid-item-${item.id}`}
-                style={styles.gridItem}
-                onPress={() => router.push({ pathname: "/explore-detail/[id]", params: { id: item.id } })}
-                onLongPress={() => confirmDelete(item.id, item.recipeName)}
-                activeOpacity={0.85}
-              >
-                <Image 
-                  source={{ uri: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80' }} 
-                  style={styles.gridImage} 
-                  resizeMode="cover" 
-                />
-                <View style={styles.gridTitleWrap}>
-                  <Text style={styles.gridTitle} numberOfLines={2}>{item.recipeName}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {displayedRecipes.map((item) => {
+              const isItemSelected = selectedRecipeIds.includes(item.id);
+              return (
+                <TouchableOpacity
+                  key={`grid-item-${item.id}`}
+                  style={[
+                    styles.gridItem,
+                    isSelectingRecipes && isItemSelected && styles.gridItemSelected,
+                  ]}
+                  onPress={() => {
+                    if (isSelectingRecipes) {
+                      toggleSelectRecipe(item.id);
+                    } else {
+                      router.push({ pathname: "/explore-detail/[id]", params: { id: item.id } });
+                    }
+                  }}
+                  onLongPress={() => {
+                    if (!isSelectingRecipes) {
+                      setIsSelectingRecipes(true);
+                      setSelectedRecipeIds([item.id]);
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80' }}
+                    style={styles.gridImage}
+                    resizeMode="cover"
+                  />
+                  {isSelectingRecipes && (
+                    <View
+                      style={[
+                        styles.selectionCheckBadge,
+                        isItemSelected && styles.selectionCheckBadgeActive,
+                      ]}
+                    >
+                      {isItemSelected && <Ionicons name="checkmark" size={15} color="#fff" />}
+                    </View>
+                  )}
+                  <View style={styles.gridTitleWrap}>
+                    <Text style={styles.gridTitle} numberOfLines={2}>{item.recipeName}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ) : (
           <View style={styles.emptyBox}>
@@ -364,6 +607,70 @@ export default function NotebookScreen() {
         onClose={() => setIsCreateCollectionOpen(false)}
         onCreateCollection={handleCreateCollection}
       />
+
+      {/* MODAL ĐỔI TÊN BỘ SƯU TẬP */}
+      <Modal
+        visible={editingCollection !== null}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setEditingCollection(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setEditingCollection(null)} />
+          <KeyboardAvoidingView
+            style={{ justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.renameModalCard}>
+              <View style={styles.handleBar} />
+              <View style={styles.renameHeaderRow}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.renameModalTitle}>Đổi tên bộ sưu tập</Text>
+                  <Text style={styles.renameModalSub}>Nhập tên mới cho bộ sưu tập của bạn.</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.renameCloseBtn}
+                  onPress={() => setEditingCollection(null)}
+                >
+                  <Ionicons name="close" size={20} color={COLORS.primaryText} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.renameInputLabel}>Tên bộ sưu tập</Text>
+              <TextInput
+                style={styles.renameInput}
+                placeholder="Nhập tên bộ sưu tập..."
+                placeholderTextColor="#94a3b8"
+                value={editingName}
+                onChangeText={setEditingName}
+                maxLength={40}
+                autoFocus
+              />
+
+              <View style={styles.renameActionsRow}>
+                <TouchableOpacity
+                  style={styles.renameCancelBtn}
+                  onPress={() => setEditingCollection(null)}
+                >
+                  <Text style={styles.renameCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.renameSaveBtn, (!editingName.trim() || isSavingRename) && { opacity: 0.5 }]}
+                  disabled={!editingName.trim() || isSavingRename}
+                  onPress={handleSaveRenameCollection}
+                >
+                  {isSavingRename ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.renameSaveText}>Lưu thay đổi</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       <Modal
         animationType="slide"
@@ -544,21 +851,22 @@ const styles = StyleSheet.create({
   bannerContent: {
     position: 'absolute',
     zIndex: 2,
+    top: 18,
     left: 16,
     right: 16,
     bottom: 16,
+    justifyContent: 'space-between',
   },
   bannerTitle: {
     color: COLORS.white,
     fontSize: 21,
-    lineHeight: 25,
+    lineHeight: 26,
     fontWeight: '800',
     maxWidth: '88%',
   },
   bannerActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
   },
   bannerSub: {
     color: '#DFF3EA',
@@ -568,7 +876,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
@@ -612,6 +920,49 @@ const styles = StyleSheet.create({
     borderColor: COLORS.accent,
     borderWidth: 2,
   },
+  collectionCardEmpty: {
+    backgroundColor: '#F6FAF7',
+    borderColor: '#D5E8D8',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  emptyCardInner: {
+    flex: 1,
+    padding: 11,
+    justifyContent: 'space-between',
+  },
+  emptyCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  collectionIconEmpty: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: '#E3F3E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyCardPlusBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E3F3E6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  collectionNameEmpty: {
+    color: COLORS.primaryText,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  collectionSubEmpty: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 3,
+  },
   collectionImage: {
     width: '100%',
     height: '100%',
@@ -628,6 +979,17 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 9,
     backgroundColor: 'rgba(26, 58, 26, 0.68)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  collectionMenuBtn: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -682,6 +1044,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     lineHeight: 18,
   },
+  recipeHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectModeBtn: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: COLORS.mutedSurface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  selectModeBtnActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+  },
+  selectModeBtnText: {
+    color: COLORS.primaryText,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  selectModeBtnTextActive: {
+    color: COLORS.danger,
+  },
   recipeCountBadge: {
     minWidth: 30,
     height: 30,
@@ -716,9 +1103,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 7,
+    flexShrink: 1,
   },
   clearFilterText: {
     color: COLORS.primaryText,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  selectionActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FED7D7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  selectionCountText: {
+    color: '#9B2C2C',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  confirmDeleteSelectedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.danger,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 5,
+  },
+  confirmDeleteSelectedText: {
+    color: '#fff',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -736,6 +1156,29 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
+    position: 'relative',
+  },
+  gridItemSelected: {
+    borderColor: COLORS.danger,
+    borderWidth: 2,
+  },
+  selectionCheckBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  selectionCheckBadgeActive: {
+    backgroundColor: COLORS.danger,
+    borderColor: COLORS.danger,
   },
   gridImage: {
     width: '100%',
@@ -923,6 +1366,87 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  renameModalCard: {
+    width: '100%',
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  renameHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  renameModalTitle: {
+    color: COLORS.primaryText,
+    fontSize: 21,
+    fontWeight: '800',
+  },
+  renameModalSub: {
+    color: COLORS.secondaryText,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  renameCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.mutedSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renameInputLabel: {
+    color: COLORS.primaryText,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  renameInput: {
+    minHeight: 50,
+    backgroundColor: '#F8FAF8',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    color: COLORS.primaryText,
+    fontSize: 15,
+    marginBottom: 22,
+  },
+  renameActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  renameCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.mutedSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renameCancelText: {
+    color: COLORS.secondaryText,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  renameSaveBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renameSaveText: {
+    color: '#fff',
     fontSize: 15,
     fontWeight: '800',
   },

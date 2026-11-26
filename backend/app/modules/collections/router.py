@@ -7,7 +7,7 @@ from app.api.dependencies import get_current_user
 from app.core.responses import success_response
 from app.db import get_db
 from app.modules.collections.model import CollectionDB
-from app.modules.collections.schema import CollectionCreate, CollectionDetailResponse, CollectionResponse, RecipeInCollectionsResponse
+from app.modules.collections.schema import CollectionCreate, CollectionUpdate, CollectionDetailResponse, CollectionResponse, RecipeInCollectionsResponse
 from app.modules.collections.service import CollectionService
 from app.modules.users.model import UserDB
 
@@ -111,6 +111,45 @@ def get_collection_detail(
             detail="Không tìm thấy bộ sưu tập"
         )
     return col_detail
+
+
+# 5b. API ĐỔI TÊN / CẬP NHẬT BỘ SƯU TẬP (PUT /api/collections/{collection_id})
+@router.put("/{collection_id}", response_model=CollectionResponse)
+def update_user_collection(
+    collection_id: int,
+    collection_in: CollectionUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    if not collection_in.name or not collection_in.name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tên bộ sưu tập không được để trống"
+        )
+
+    existing_col = db.query(CollectionDB).filter(
+        CollectionDB.user_id == current_user.id,
+        CollectionDB.id != collection_id,
+        func.lower(CollectionDB.name) == collection_in.name.strip().lower()
+    ).first()
+    if existing_col:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bộ sưu tập với tên này đã tồn tại"
+        )
+
+    updated = CollectionService.update_collection(
+        db=db,
+        collection_id=collection_id,
+        user_id=current_user.id,
+        collection_in=collection_in
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy bộ sưu tập"
+        )
+    return updated
 
 
 # 6. API XÓA BỘ SƯU TẬP (DELETE /api/collections/{collection_id})

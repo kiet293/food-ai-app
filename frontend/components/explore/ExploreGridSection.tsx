@@ -66,7 +66,7 @@ export const ExploreGridSection: React.FC<{ refreshTrigger?: number, selectedTag
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>EXPLORE.</Text>
+        <Text style={styles.sectionTitle}>Khám phá</Text>
       </View>
       <FlatList
         data={data}

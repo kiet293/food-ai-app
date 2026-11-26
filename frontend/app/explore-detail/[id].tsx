@@ -35,7 +35,7 @@ export default function ExploreDetailScreen() {
         }}>
           <Ionicons name="arrow-back" size={26} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>EXPLORE.</Text>
+        <Text style={styles.headerTitle}>Khám phá</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -68,8 +68,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-    color: '#000',
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    color: '#1a2e1a',
   },
 });

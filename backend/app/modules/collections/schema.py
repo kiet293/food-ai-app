@@ -6,6 +6,10 @@ class CollectionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Tên bộ sưu tập không được để trống và tối đa 100 ký tự")
     cover_image: Optional[str] = None
 
+class CollectionUpdate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="Tên mới của bộ sưu tập")
+    cover_image: Optional[str] = None
+
 class CollectionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

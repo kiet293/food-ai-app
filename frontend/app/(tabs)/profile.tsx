@@ -15,7 +15,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import { getUserProfile, logoutUser, updateUserProfile, updateUserAvatar } from '@/services/auth/authService';
-import { getSavedRecipes } from '@/services/recipe/recipeService';
+import { getCollections, CollectionFolder } from '@/services/collection/collectionService';
 import { useAuth } from '../_layout';
 
 // Import sub-components từ package components/profile/
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
   const { signOut } = useAuth();
 
   const [userInfo, setUserInfo] = useState<ProfileUserData | null>(null);
-  const [savedRecipesList, setSavedRecipesList] = useState<any[]>([]);
+  const [collectionsList, setCollectionsList] = useState<CollectionFolder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Tab đang chọn: 'posted' | 'saved' | 'liked' | 'private'
@@ -82,8 +82,8 @@ export default function ProfileScreen() {
         setUserInfo(data);
       }
 
-      const recipes = await getSavedRecipes();
-      setSavedRecipesList(recipes || []);
+      const cols = await getCollections();
+      setCollectionsList(cols || []);
     } catch (e) {
       console.warn("Lỗi tải thông tin cá nhân:", e);
     } finally {
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
 
           {/* 5. Section Bài viết mới thêm (Recently Added Carousel) */}
           <ProfileRecentlyAdded
-            recipes={savedRecipesList || []}
+            recipes={userInfo.recent_recipes || []}
             isDarkMode={isDarkMode}
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
@@ -293,16 +293,17 @@ export default function ProfileScreen() {
             onTabChange={(tab) => setActiveTab(tab)}
           />
 
-          {/* 7. Grid Nội Dung Video & Công Thức */}
+          {/* 7. Grid Nội Dung Video & Bộ Sưu Tập */}
           <ProfileVideoGrid
             activeTab={activeTab}
             reelsList={userInfo.my_reels}
-            savedRecipesList={savedRecipesList}
+            savedRecipesList={collectionsList}
             likedReelsList={userInfo.liked_reels}
             dynamicTextColor={dynamicTextColor}
             dynamicSubTextColor={dynamicSubTextColor}
             dynamicCardBg={dynamicCardBg}
             onNavigateToPlay={(reelId) => router.push({ pathname: '/(tabs)/play', params: { reelId } })}
+            onPressCollection={(collectionId) => router.push({ pathname: '/(tabs)/notebook', params: { collectionId } })}
           />
         </ScrollView>
       ) : null}

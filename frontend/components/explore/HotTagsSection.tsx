@@ -15,7 +15,7 @@ export const HotTagsSection: React.FC<HotTagsSectionProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>HOT TAGS.</Text>
+        <Text style={styles.sectionTitle}>Chủ đề hot</Text>
       </View>
       <ScrollView
         horizontal

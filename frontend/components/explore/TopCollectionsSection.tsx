@@ -13,7 +13,7 @@ export const TopCollectionsSection: React.FC<TopCollectionsSectionProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>TOP COLLECTIONS.</Text>
+        <Text style={styles.sectionTitle}>Bộ sưu tập nổi bật</Text>
       </View>
       <ScrollView
         horizontal
@@ -29,7 +29,7 @@ export const TopCollectionsSection: React.FC<TopCollectionsSectionProps> = ({
             </View>
             <View style={styles.collectionContent}>
               <Text style={styles.collectionTitle}>{collection.title}</Text>
-              <Text style={styles.collectionSub}>{collection.recipeCount} recipes</Text>
+              <Text style={styles.collectionSub}>{collection.recipeCount} công thức</Text>
             </View>
           </TouchableOpacity>
         ))}

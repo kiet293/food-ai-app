@@ -64,8 +64,11 @@ class UserService:
             # 5. Đếm số công thức đã lưu
             saved_recipes_count = db.query(FavoriteDB).filter(FavoriteDB.user_id == current_user.id).count()
 
-            # 6. Lấy danh sách công thức của chính người dùng này
-            recent_recipes = db.query(RecipeDB).filter(RecipeDB.user_id == current_user.id).order_by(RecipeDB.created_at.desc()).limit(10).all()
+            # 6. Lấy danh sách công thức cộng đồng của chính người dùng này (không lấy món AI nháp)
+            recent_recipes = db.query(RecipeDB).filter(
+                RecipeDB.user_id == current_user.id,
+                RecipeDB.is_ai == False
+            ).order_by(RecipeDB.created_at.desc()).limit(10).all()
             recent_data = [
                 {
                     "id": str(r.id),

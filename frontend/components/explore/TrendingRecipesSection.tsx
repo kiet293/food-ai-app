@@ -19,7 +19,7 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>TRENDING RECIPES.</Text>
+        <Text style={styles.sectionTitle}>Công thức thịnh hành</Text>
       </View>
       <ScrollView
         horizontal
@@ -34,7 +34,11 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
             activeOpacity={0.9}
           >
             <Image source={{ uri: recipe.image }} style={styles.trendingImage} />
-            <View style={styles.trendingOverlay} />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.82)']}
+              locations={[0, 0.45, 1]}
+              style={styles.trendingOverlay}
+            />
 
             {recipe.badge && (
               <LinearGradient
@@ -49,8 +53,8 @@ export const TrendingRecipesSection: React.FC<TrendingRecipesSectionProps> = ({
             )}
 
             <View style={styles.trendingContent}>
-              <Text style={styles.trendingTitle}>{recipe.title}</Text>
-              <Text style={styles.trendingSub}>By {recipe.author}</Text>
+              <Text style={styles.trendingTitle} numberOfLines={2}>{recipe.title}</Text>
+              <Text style={styles.trendingSub} numberOfLines={1}>bởi {recipe.author}</Text>
             </View>
 
             <TouchableOpacity
@@ -102,7 +106,6 @@ const styles = StyleSheet.create({
   },
   trendingOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   recipeBadge: {
     position: 'absolute',
@@ -139,12 +142,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#fff',
-    lineHeight: 18,
+    lineHeight: 19,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   trendingSub: {
     fontSize: 11,
-    color: '#ddd',
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 3,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   bookmarkBtn: {
     position: 'absolute',

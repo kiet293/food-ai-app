@@ -15,6 +15,7 @@ interface ProfileVideoGridProps {
   dynamicSubTextColor: string;
   dynamicCardBg: string;
   onNavigateToPlay: (reelId: string) => void;
+  onPressCollection?: (collectionId: string) => void;
 }
 
 export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
@@ -26,6 +27,7 @@ export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
   dynamicSubTextColor,
   dynamicCardBg,
   onNavigateToPlay,
+  onPressCollection,
 }) => {
   if (activeTab === 'posted') {
     return (
@@ -62,25 +64,43 @@ export const ProfileVideoGrid: React.FC<ProfileVideoGridProps> = ({
   if (activeTab === 'saved') {
     return (
       <View style={styles.recipesTabContainer}>
-        <Text style={[styles.collectionsHeaderTitle, { color: dynamicTextColor }]}>BỘ SỰ TẬP</Text>
+        <Text style={[styles.collectionsHeaderTitle, { color: dynamicTextColor }]}>Bộ sưu tập</Text>
         {savedRecipesList && savedRecipesList.length > 0 ? (
-          savedRecipesList.map((item, idx) => (
-            <View key={item.id || idx} style={[styles.recipeCard, { backgroundColor: dynamicCardBg }]}>
-              <Image
-                source={{ uri: item.imageUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500' }}
-                style={styles.recipeImg}
-              />
-              <View style={styles.recipeInfo}>
-                <Text style={[styles.recipeTitle, { color: dynamicTextColor }]} numberOfLines={1}>
-                  {item.recipeName || item.title || 'Món ăn đã lưu'}
-                </Text>
-                <Text style={[styles.recipeSub, { color: dynamicSubTextColor }]}>
-                  {item.savedAt ? `Đã lưu: ${item.savedAt}` : (item.time || '15 phút · 350 kcal')}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#aaa" />
-            </View>
-          ))
+          savedRecipesList.map((item, idx) => {
+            const count = item.recipeCount ?? item.count ?? 0;
+            const isEmpty = count === 0;
+            const title = item.name || item.title || item.recipeName || 'Bộ sưu tập';
+            const cover = item.coverImage || item.image || item.imageUrl;
+
+            return (
+              <TouchableOpacity
+                key={item.id || idx}
+                style={[styles.recipeCard, { backgroundColor: dynamicCardBg }]}
+                activeOpacity={0.8}
+                onPress={() => onPressCollection && item.id && onPressCollection(String(item.id))}
+              >
+                {isEmpty ? (
+                  <View style={styles.emptyCollectionThumb}>
+                    <Ionicons name="folder-open-outline" size={22} color="#28a745" />
+                  </View>
+                ) : (
+                  <Image
+                    source={{ uri: cover || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500' }}
+                    style={styles.recipeImg}
+                  />
+                )}
+                <View style={styles.recipeInfo}>
+                  <Text style={[styles.recipeTitle, { color: dynamicTextColor }]} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  <Text style={[styles.recipeSub, { color: dynamicSubTextColor }]}>
+                    {`${count} công thức`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#aaa" />
+              </TouchableOpacity>
+            );
+          })
         ) : (
           <View style={styles.emptyCollectionsState}>
             <Text style={[styles.emptyCollectionsSub, { color: dynamicSubTextColor }]}>
@@ -200,7 +220,18 @@ const styles = StyleSheet.create({
   recipeImg: {
     width: 54,
     height: 54,
-    borderRadius: 8,
+    borderRadius: 10,
+  },
+  emptyCollectionThumb: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   recipeInfo: {
     flex: 1,
